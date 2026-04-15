@@ -1,6 +1,6 @@
 import fs from 'node:fs';
-import path from 'node:path';
 import os from 'node:os';
+import path from 'node:path';
 
 const AUTH_DIR = path.join(os.homedir(), '.config', 'jarvis');
 const AUTH_PATH = path.join(AUTH_DIR, 'auth.json');
@@ -15,10 +15,34 @@ export type OAuthAuth = {
 export type AuthEntry = ApiKeyAuth | OAuthAuth;
 export type AuthStore = Record<string, AuthEntry>;
 
+function isObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+function parseEntry(raw: unknown): AuthEntry | null {
+  if (!isObject(raw)) return null;
+  if (raw.type === 'api' && typeof raw.key === 'string') {
+    return { type: 'api', key: raw.key };
+  }
+  if (raw.type === 'oauth' && typeof raw.access === 'string') {
+    const out: OAuthAuth = { type: 'oauth', access: raw.access };
+    if (typeof raw.refresh === 'string') out.refresh = raw.refresh;
+    if (typeof raw.expiresAt === 'number') out.expiresAt = raw.expiresAt;
+    return out;
+  }
+  return null;
+}
+
 function readStore(): AuthStore {
   try {
-    const raw = fs.readFileSync(AUTH_PATH, 'utf8');
-    return JSON.parse(raw) as AuthStore;
+    const raw = JSON.parse(fs.readFileSync(AUTH_PATH, 'utf8')) as unknown;
+    if (!isObject(raw)) return {};
+    const out: AuthStore = {};
+    for (const [k, v] of Object.entries(raw)) {
+      const entry = parseEntry(v);
+      if (entry) out[k] = entry;
+    }
+    return out;
   } catch {
     return {};
   }
@@ -26,7 +50,9 @@ function readStore(): AuthStore {
 
 function writeStore(store: AuthStore): void {
   fs.mkdirSync(AUTH_DIR, { recursive: true, mode: 0o700 });
-  fs.writeFileSync(AUTH_PATH, JSON.stringify(store, null, 2), { mode: 0o600 });
+  const tmp = `${AUTH_PATH}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(store, null, 2), { mode: 0o600 });
+  fs.renameSync(tmp, AUTH_PATH);
 }
 
 export function setAuth(providerId: string, entry: AuthEntry): void {

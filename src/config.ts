@@ -1,6 +1,6 @@
 import fs from 'node:fs';
-import path from 'node:path';
 import os from 'node:os';
+import path from 'node:path';
 
 const CONFIG_DIR = path.join(os.homedir(), '.config', 'jarvis');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
@@ -10,10 +10,18 @@ export type Config = {
   modelId?: string;
 };
 
+function isObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
 export function loadConfig(): Config {
   try {
-    const raw = fs.readFileSync(CONFIG_PATH, 'utf8');
-    return JSON.parse(raw) as Config;
+    const raw = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')) as unknown;
+    if (!isObject(raw)) return {};
+    const cfg: Config = {};
+    if (typeof raw.providerId === 'string') cfg.providerId = raw.providerId;
+    if (typeof raw.modelId === 'string') cfg.modelId = raw.modelId;
+    return cfg;
   } catch {
     return {};
   }
@@ -21,5 +29,7 @@ export function loadConfig(): Config {
 
 export function saveConfig(config: Config): void {
   fs.mkdirSync(CONFIG_DIR, { recursive: true });
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+  const tmp = `${CONFIG_PATH}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(config, null, 2));
+  fs.renameSync(tmp, CONFIG_PATH);
 }
