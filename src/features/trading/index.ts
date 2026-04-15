@@ -18,4 +18,4 @@ export function bootstrapTrading(): void {
 }
 
 export type { Candle } from './tools/get-ohlcv.js';
-export { atr, ema, macd, rsi, sma } from './tools/indicators.js';
+export { adx, atr, bollinger, ema, macd, rsi, sma, stochastic, vwap } from './tools/indicators.js';

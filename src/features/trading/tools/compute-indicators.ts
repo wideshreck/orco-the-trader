@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { defineTool } from '../../tools/define.js';
 import type { Candle } from './get-ohlcv.js';
-import { atr, ema, macd, rsi, sma } from './indicators.js';
+import { adx, atr, bollinger, ema, macd, rsi, sma, stochastic, vwap } from './indicators.js';
 
 const indicatorName = z.enum([
   'sma20',
@@ -12,6 +12,10 @@ const indicatorName = z.enum([
   'rsi14',
   'macd',
   'atr14',
+  'bb20',
+  'stoch',
+  'vwap',
+  'adx14',
 ]);
 
 const candleSchema = z.object({
@@ -35,6 +39,10 @@ export const computeIndicators = defineTool({
     '  rsi14 — Wilder RSI over 14 periods',
     '  macd — MACD(12,26,9), returns {macd, signal, histogram}',
     '  atr14 — Average True Range(14), volatility in price units',
+    '  bb20 — Bollinger Bands(20, 2), returns {upper, mid, lower, bandwidth, percentB}',
+    '  stoch — Stochastic(14, 3, 3), returns {k, d}',
+    '  vwap — Volume-weighted avg price anchored at series start',
+    '  adx14 — ADX(14), returns {adx, plusDI, minusDI}. Trend strength: <20 weak, >25 strong',
     '',
     'Returns null for any indicator that requires more history than the series',
     'provides. Always evaluate null before citing a number.',
@@ -72,6 +80,18 @@ export const computeIndicators = defineTool({
           break;
         case 'atr14':
           out.atr14 = atr(candles, 14);
+          break;
+        case 'bb20':
+          out.bb20 = bollinger(candles, 20, 2);
+          break;
+        case 'stoch':
+          out.stoch = stochastic(candles, 14, 3, 3);
+          break;
+        case 'vwap':
+          out.vwap = vwap(candles);
+          break;
+        case 'adx14':
+          out.adx14 = adx(candles, 14);
           break;
       }
     }

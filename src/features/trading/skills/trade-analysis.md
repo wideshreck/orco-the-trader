@@ -40,6 +40,13 @@ Always use `compute_indicators` — never estimate these by reading candles. Rec
 - `macd` — momentum confirmation
 - `atr14` — volatility gauge for stop sizing
 
+Optional add-ons when the read calls for it:
+
+- `bb20` — mean-reversion / breakout context. `percentB` > 1 = closed above upper band (stretched), < 0 = below lower band. Low `bandwidth` = squeeze, breakout often follows.
+- `stoch` — overbought (>80) / oversold (<20) confirmation alongside RSI; %K crossing %D = signal.
+- `adx14` — trend **strength**. <20 = chop (skip trend-following), 20–25 = developing, >25 = strong trend. Pair direction with `plusDI` vs `minusDI`.
+- `vwap` — price above/below anchored VWAP as a simple bias filter on intraday timeframes.
+
 ## 4. Read the tape
 
 Summarize the structure in this exact order (keeps the output scannable):
