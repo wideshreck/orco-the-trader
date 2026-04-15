@@ -1,5 +1,6 @@
 import { echo } from './builtin/echo.js';
 import { getTime } from './builtin/get-time.js';
+import { buildSkillTool } from './builtin/skill.js';
 import { register } from './registry.js';
 
 let bootstrapped = false;
@@ -9,6 +10,8 @@ export function bootstrapTools(): void {
   bootstrapped = true;
   register(getTime);
   register(echo);
+  const skillTool = buildSkillTool();
+  if (skillTool) register(skillTool);
 }
 
 export {

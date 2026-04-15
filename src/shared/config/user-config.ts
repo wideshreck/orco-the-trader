@@ -8,6 +8,7 @@ const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 export type Config = {
   providerId?: string;
   modelId?: string;
+  systemPrompt?: string;
 };
 
 function isObject(v: unknown): v is Record<string, unknown> {
@@ -21,6 +22,7 @@ export function loadConfig(): Config {
     const cfg: Config = {};
     if (typeof raw.providerId === 'string') cfg.providerId = raw.providerId;
     if (typeof raw.modelId === 'string') cfg.modelId = raw.modelId;
+    if (typeof raw.systemPrompt === 'string') cfg.systemPrompt = raw.systemPrompt;
     return cfg;
   } catch {
     return {};

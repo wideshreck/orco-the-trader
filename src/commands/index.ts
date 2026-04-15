@@ -11,7 +11,9 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
   { name: '/help', description: 'show all commands' },
   { name: '/model', description: 'select model' },
   { name: '/new', description: 'start a new session' },
+  { name: '/prompt', description: 'show active system prompt' },
   { name: '/sessions', description: 'browse and switch sessions' },
+  { name: '/skills', description: 'list installed skills' },
   { name: '/tools', description: 'list registered tools' },
 ] as const;
 

@@ -34,6 +34,7 @@ type Target = { provider: CatalogProvider; ref: ModelRef };
 export type UseChatOptions = {
   seedRows?: ChatRow[];
   seedCompactionPoint?: CompactionPoint | null;
+  systemPrompt?: string;
   onCommit?: (row: ChatRow) => void;
   onCompact?: (cp: CompactionPoint) => void;
 };
@@ -41,7 +42,7 @@ export type UseChatOptions = {
 const KEEP_TAIL_ROWS = 6;
 
 export function useChat(target: Target | null, approver: Approver, opts: UseChatOptions = {}) {
-  const { onCommit, onCompact } = opts;
+  const { onCommit, onCompact, systemPrompt } = opts;
   // scrollback: monotonically growing; rendered via Ink <Static> so it lands in
   // terminal scrollback and never re-renders.
   // live: actively mutating (current turn). Re-renders on every event.
@@ -121,10 +122,14 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
       let stepAssistantId = assistantId;
 
       try {
+        const systemParts: string[] = [];
+        if (systemPrompt?.trim()) systemParts.push(systemPrompt.trim());
+        if (activeCp) systemParts.push(`Summary of earlier conversation:\n${activeCp.summary}`);
+        const system = systemParts.length > 0 ? systemParts.join('\n\n') : undefined;
         for await (const ev of streamChat(target.provider, target.ref, baseHistory, {
           signal: controller.signal,
           approver,
-          ...(activeCp ? { system: `Summary of earlier conversation:\n${activeCp.summary}` } : {}),
+          ...(system ? { system } : {}),
         })) {
           switch (ev.type) {
             case 'text-delta': {
@@ -229,7 +234,7 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
       }
       return 'sent';
     },
-    [messages, streaming, target, approver, nextId, onCommit, compactionPoint],
+    [messages, streaming, target, approver, nextId, onCommit, compactionPoint, systemPrompt],
   );
 
   const compact = useCallback(async (): Promise<CompactOutcome> => {

@@ -55,6 +55,7 @@ export function App() {
   const chat = useChat(target, approval.approver, {
     seedRows: session.initial.rows,
     seedCompactionPoint: session.initial.compactionPoint,
+    ...(config.systemPrompt ? { systemPrompt: config.systemPrompt } : {}),
     onCommit: (row) => {
       session.recordRow(
         row,
@@ -219,6 +220,7 @@ export function App() {
       messages: chat.messages,
       catalog: catalog ?? {},
       ref: target?.ref ?? { providerId: '', modelId: '' },
+      ...(config.systemPrompt ? { systemPrompt: config.systemPrompt } : {}),
     });
     setInput('');
     if (result === 'send') void chat.send(trimmed);

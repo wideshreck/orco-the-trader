@@ -1,8 +1,11 @@
+import os from 'node:os';
+import path from 'node:path';
 import { isKnownCommand, SLASH_COMMANDS } from '../commands/index.js';
 import type { InfoPanel } from '../features/chat/chat-view.js';
 import { computeCost, formatTokens, formatUsd } from '../features/chat/cost.js';
 import type { ChatRow } from '../features/chat/use-chat.js';
 import type { Catalog, ModelRef } from '../features/models/catalog.js';
+import { listSkills, skillsDir } from '../features/skills/index.js';
 import { listActive, listAlwaysAllowed } from '../features/tools/index.js';
 
 export type Phase =
@@ -21,6 +24,7 @@ export type DispatchCtx = {
   messages: ChatRow[];
   catalog: Catalog;
   ref: ModelRef;
+  systemPrompt?: string;
 };
 
 export type DispatchResult = 'handled' | 'unknown' | 'send';
@@ -53,6 +57,42 @@ export function dispatchCommand(trimmed: string, ctx: DispatchCtx): DispatchResu
   }
   if (trimmed === '/compact') {
     ctx.compactChat();
+    return 'handled';
+  }
+  if (trimmed === '/skills') {
+    const skills = listSkills();
+    const home = os.homedir();
+    const dirLabel = skillsDir().replace(home, '~');
+    if (skills.length === 0) {
+      ctx.setInfoPanel({
+        title: 'skills',
+        lines: ['  (no skills installed)', `  drop SKILL.md files into ${dirLabel}/`],
+      });
+    } else {
+      const lines = skills.map((s) => `  ${s.name.padEnd(16)}  ${s.description}`);
+      lines.push('', `  directory: ${dirLabel}`);
+      ctx.setInfoPanel({ title: 'skills', lines });
+    }
+    return 'handled';
+  }
+  if (trimmed === '/prompt') {
+    const sp = ctx.systemPrompt?.trim();
+    const configLabel = path.join('~', '.config', 'orco', 'config.json');
+    if (sp) {
+      const preview = sp.length > 600 ? `${sp.slice(0, 597)}...` : sp;
+      ctx.setInfoPanel({
+        title: 'system prompt',
+        lines: preview
+          .split('\n')
+          .map((l) => `  ${l}`)
+          .concat('', `  edit: ${configLabel} (systemPrompt)`),
+      });
+    } else {
+      ctx.setInfoPanel({
+        title: 'system prompt',
+        lines: ['  (no system prompt set)', `  add "systemPrompt" string in ${configLabel}`],
+      });
+    }
     return 'handled';
   }
   if (trimmed === '/help') {
