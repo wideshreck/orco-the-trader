@@ -34,7 +34,12 @@ export const todoWrite = defineTool({
     todos: z.array(todoSchema).describe('The full todo list in the desired order'),
   }),
   async execute(input) {
-    writeTodos(input.todos);
-    return { count: input.todos.length };
+    const todos = input.todos.map((t) => ({
+      content: t.content,
+      status: t.status,
+      ...(t.activeForm !== undefined ? { activeForm: t.activeForm } : {}),
+    }));
+    writeTodos(todos);
+    return { count: todos.length };
   },
 });
