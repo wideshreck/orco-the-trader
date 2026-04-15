@@ -17,6 +17,7 @@ export type DispatchCtx = {
   setInfoPanel: (p: InfoPanel | null) => void;
   exit: () => void;
   clearChat: () => void;
+  compactChat: () => void;
   messages: ChatRow[];
   catalog: Catalog;
   ref: ModelRef;
@@ -48,6 +49,10 @@ export function dispatchCommand(trimmed: string, ctx: DispatchCtx): DispatchResu
   }
   if (trimmed === '/cost') {
     ctx.setInfoPanel(buildCostPanel(ctx.messages, ctx.catalog, ctx.ref));
+    return 'handled';
+  }
+  if (trimmed === '/compact') {
+    ctx.compactChat();
     return 'handled';
   }
   if (trimmed === '/help') {

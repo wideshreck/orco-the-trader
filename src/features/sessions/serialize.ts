@@ -26,6 +26,22 @@ export function chatRowToEvent(row: ChatRow, ts: number): SessionEvent {
   return ev;
 }
 
+export type CompactionPoint = { afterId: number; summary: string };
+
+export type LoadedSession = {
+  rows: ChatRow[];
+  compactionPoint: CompactionPoint | null;
+};
+
+export function eventsToSession(events: SessionEvent[]): LoadedSession {
+  const rows = eventsToChatRows(events);
+  let compactionPoint: CompactionPoint | null = null;
+  for (const ev of events) {
+    if (ev.t === 'compact') compactionPoint = { afterId: ev.afterId, summary: ev.summary };
+  }
+  return { rows, compactionPoint };
+}
+
 export function eventsToChatRows(events: SessionEvent[]): ChatRow[] {
   const rows: ChatRow[] = [];
   for (const ev of events) {

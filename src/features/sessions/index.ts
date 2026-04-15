@@ -43,9 +43,11 @@ export function titleFromUserMessage(content: string): string {
   return `${single.slice(0, TITLE_MAX_LEN - 1)}…`;
 }
 
+export type { CompactionPoint, LoadedSession } from './serialize.js';
 export {
   chatRowsToModelMessages,
   chatRowToEvent,
   eventsToChatRows,
+  eventsToSession,
 } from './serialize.js';
 export type { SessionEvent, SessionId, SessionIndex, SessionMeta } from './types.js';

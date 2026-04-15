@@ -28,6 +28,8 @@ export function ChatView(props: {
   approval: ApprovalRequest | null;
   infoPanel: InfoPanel | null;
   formatUsage: (usage: TokenUsage) => string;
+  contextLimit: number | null;
+  compactionActive: boolean;
 }) {
   const {
     modelLabel,
@@ -46,6 +48,13 @@ export function ChatView(props: {
   const showSuggestions = focus === 'input' && !streaming && !approval && suggestions.length > 0;
   const inputActive = focus === 'input' && !streaming && !approval;
   const totalTokens = sumTokens([...scrollback, ...live]);
+  const lastInputTokens = lastTurnInput([...scrollback, ...live]);
+  const { contextLimit, compactionActive } = props;
+  const ratio =
+    contextLimit && contextLimit > 0 && lastInputTokens > 0 ? lastInputTokens / contextLimit : 0;
+  const contextColor: 'green' | 'yellow' | 'red' =
+    ratio < 0.5 ? 'green' : ratio < 0.8 ? 'yellow' : 'red';
+  const contextWarn = ratio >= 0.75;
 
   return (
     <>
@@ -150,6 +159,13 @@ export function ChatView(props: {
           </Box>
         </Box>
 
+        {contextWarn && (
+          <Box>
+            <Text color="yellow">
+              ⚠ context {Math.round(ratio * 100)}% full — /compact to summarize older messages
+            </Text>
+          </Box>
+        )}
         <Box paddingX={1} justifyContent="space-between">
           <Box>
             <Text dimColor>{modelLabel}</Text>
@@ -161,6 +177,14 @@ export function ChatView(props: {
                 {formatTokens(totalTokens.inputTokens)}/{formatTokens(totalTokens.outputTokens)}
               </Text>
             )}
+            {contextLimit && lastInputTokens > 0 && (
+              <Text color={contextColor}>
+                {' · '}
+                {formatTokens(lastInputTokens)}/{formatTokens(contextLimit)} (
+                {Math.round(ratio * 100)}%)
+              </Text>
+            )}
+            {compactionActive && <Text color="cyan">{' · compacted'}</Text>}
             {focus === 'tools-bar' && (
               <Text dimColor>{'  '}(↓ tools-bar focused · enter open · esc back)</Text>
             )}
@@ -231,6 +255,14 @@ function sumTokens(rows: ChatRow[]): TokenUsage {
     }
   }
   return { inputTokens, outputTokens };
+}
+
+function lastTurnInput(rows: ChatRow[]): number {
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const r = rows[i];
+    if (r && r.kind === 'assistant' && r.usage) return r.usage.inputTokens;
+  }
+  return 0;
 }
 
 function truncateLabel(s: string): string {

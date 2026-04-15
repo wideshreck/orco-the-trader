@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatRow } from '../chat/use-chat.js';
 import {
   appendToSession,
+  type CompactionPoint,
   chatRowToEvent,
   createSession,
-  eventsToChatRows,
+  eventsToSession,
   listSessions,
   loadSession,
   reconcileIndex,
@@ -15,20 +16,28 @@ import {
   titleFromUserMessage,
 } from './index.js';
 
+export type SessionLoad = {
+  rows: ChatRow[];
+  compactionPoint: CompactionPoint | null;
+};
+
 export type SessionChannel = {
   currentId: SessionId | null;
-  initialRows: ChatRow[];
+  initial: SessionLoad;
   ready: boolean;
   recordRow: (row: ChatRow, modelInfo?: { providerId: string; modelId: string }) => void;
+  recordCompact: (cp: CompactionPoint) => void;
   startNew: () => void;
-  switchTo: (id: SessionId) => ChatRow[];
+  switchTo: (id: SessionId) => SessionLoad;
   list: () => SessionMeta[];
   remove: (id: SessionId) => void;
 };
 
+const EMPTY_LOAD: SessionLoad = { rows: [], compactionPoint: null };
+
 export function useSession(): SessionChannel {
   const [currentId, setCurrentIdState] = useState<SessionId | null>(null);
-  const [initialRows, setInitialRows] = useState<ChatRow[]>([]);
+  const [initial, setInitial] = useState<SessionLoad>(EMPTY_LOAD);
   const [ready, setReady] = useState(false);
   // Refs are the source of truth so synchronous successive recordRow calls in the
   // same render cycle see consistent state (React state updates are async).
@@ -49,9 +58,9 @@ export function useSession(): SessionChannel {
     const head = sessions[0];
     if (head) {
       const events = loadSession(head.id);
-      const rows = eventsToChatRows(events);
+      const load = eventsToSession(events);
       setCurrentId(head.id);
-      setInitialRows(rows);
+      setInitial(load);
       titleRef.current = head.title;
       messageCountRef.current = head.messageCount;
       createdAtRef.current = head.createdAt;
@@ -114,9 +123,23 @@ export function useSession(): SessionChannel {
     [ensureSession],
   );
 
+  const recordCompact = useCallback((cp: CompactionPoint) => {
+    const id = currentIdRef.current;
+    if (!id) return;
+    const ts = Date.now();
+    appendToSession(id, { t: 'compact', ts, afterId: cp.afterId, summary: cp.summary });
+    refreshMeta({
+      id,
+      title: titleRef.current ?? '(untitled)',
+      createdAt: createdAtRef.current || ts,
+      lastModified: ts,
+      messageCount: messageCountRef.current,
+    });
+  }, []);
+
   const startNew = useCallback(() => {
     setCurrentId(null);
-    setInitialRows([]);
+    setInitial(EMPTY_LOAD);
     titleRef.current = null;
     messageCountRef.current = 0;
     createdAtRef.current = 0;
@@ -124,17 +147,17 @@ export function useSession(): SessionChannel {
   }, [setCurrentId]);
 
   const switchTo = useCallback(
-    (id: SessionId): ChatRow[] => {
+    (id: SessionId): SessionLoad => {
       const events = loadSession(id);
-      const rows = eventsToChatRows(events);
+      const load = eventsToSession(events);
       const meta = listSessions().find((s) => s.id === id);
       setCurrentId(id);
-      setInitialRows(rows);
+      setInitial(load);
       titleRef.current = meta?.title ?? '(untitled)';
-      messageCountRef.current = meta?.messageCount ?? rows.length;
+      messageCountRef.current = meta?.messageCount ?? load.rows.length;
       createdAtRef.current = meta?.createdAt ?? Date.now();
       modelLoggedRef.current = true;
-      return rows;
+      return load;
     },
     [setCurrentId],
   );
@@ -148,5 +171,15 @@ export function useSession(): SessionChannel {
     [startNew],
   );
 
-  return { currentId, initialRows, ready, recordRow, startNew, switchTo, list, remove };
+  return {
+    currentId,
+    initial,
+    ready,
+    recordRow,
+    recordCompact,
+    startNew,
+    switchTo,
+    list,
+    remove,
+  };
 }

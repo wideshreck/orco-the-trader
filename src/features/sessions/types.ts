@@ -24,7 +24,8 @@ export type SessionEvent =
       output?: unknown;
       error?: string;
       status: 'pending' | 'awaiting-approval' | 'done' | 'error' | 'denied';
-    };
+    }
+  | { t: 'compact'; ts: number; afterId: number; summary: string };
 
 export type SessionMeta = {
   id: SessionId;

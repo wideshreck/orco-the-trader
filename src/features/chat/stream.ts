@@ -10,6 +10,7 @@ import type { ChatRow } from './use-chat.js';
 export type StreamOptions = {
   signal?: AbortSignal;
   approver: Approver;
+  system?: string;
 };
 
 bootstrapTools();
@@ -35,6 +36,7 @@ export async function* streamChat(
     messages: modelMessages,
     tools,
     stopWhen: stepCountIs(20),
+    ...(opts.system ? { system: opts.system } : {}),
     ...(opts.signal ? { abortSignal: opts.signal } : {}),
   });
 

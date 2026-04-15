@@ -53,13 +53,15 @@ export function App() {
   const approval = useApproval();
   const session = useSession();
   const chat = useChat(target, approval.approver, {
-    seedRows: session.initialRows,
+    seedRows: session.initial.rows,
+    seedCompactionPoint: session.initial.compactionPoint,
     onCommit: (row) => {
       session.recordRow(
         row,
         target ? { providerId: target.ref.providerId, modelId: target.ref.modelId } : undefined,
       );
     },
+    onCompact: (cp) => session.recordCompact(cp),
   });
 
   // Safety: if stream ends with an unresolved approval (e.g. user aborted), deny it.
@@ -185,7 +187,34 @@ export function App() {
       clearChat: () => {
         if (chat.streaming) chat.cancel();
         session.startNew();
-        chat.reset([]);
+        chat.reset({ rows: [], compactionPoint: null });
+      },
+      compactChat: async () => {
+        const outcome = await chat.compact();
+        if (outcome === 'too-short') {
+          setInfoPanel({
+            title: 'compact',
+            lines: [
+              '  conversation too short to compact',
+              '  at least 7 messages needed (~3 turns)',
+            ],
+          });
+        } else if (outcome === 'error') {
+          setInfoPanel({
+            title: 'compact',
+            lines: ['  failed to generate summary', '  try again or check network'],
+          });
+        } else if (outcome === 'busy') {
+          setInfoPanel({
+            title: 'compact',
+            lines: ['  stream is still running', '  wait or ctrl+c first'],
+          });
+        } else if (outcome === 'compacted') {
+          setInfoPanel({
+            title: 'compact',
+            lines: ['  ✓ older messages summarized', '  context trimmed for next turns'],
+          });
+        }
       },
       messages: chat.messages,
       catalog: catalog ?? {},
@@ -243,8 +272,8 @@ export function App() {
         currentId={session.currentId}
         onCancel={() => setPhase({ kind: 'chat' })}
         onPick={(id) => {
-          const rows = session.switchTo(id);
-          chat.reset(rows);
+          const load = session.switchTo(id);
+          chat.reset(load);
           setPhase({ kind: 'chat' });
         }}
         onDelete={(id) => {
@@ -265,6 +294,8 @@ export function App() {
   const sessionLabel = sessionMeta ? sessionMeta.title : 'new session';
   const formatUsage = (usage: { inputTokens: number; outputTokens: number }) =>
     formatUsageLine(usage, computeCost(usage, catalog, target.ref));
+  const contextLimit =
+    catalog[target.ref.providerId]?.models[target.ref.modelId]?.limit?.context ?? null;
 
   return (
     <ChatView
@@ -283,6 +314,8 @@ export function App() {
       approval={approval.pending}
       infoPanel={infoPanel}
       formatUsage={formatUsage}
+      contextLimit={contextLimit}
+      compactionActive={chat.compactionPoint !== null}
     />
   );
 }

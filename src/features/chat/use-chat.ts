@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { errorMessage, isAbortError } from '../../shared/errors/index.js';
 import type { CatalogProvider, ModelRef } from '../models/catalog.js';
+import type { CompactionPoint } from '../sessions/index.js';
 import type { Approver, TokenUsage } from '../tools/index.js';
+import { summarizeRows } from './compact.js';
 import { streamChat } from './stream.js';
 
 export type UserRow = { id: number; kind: 'user'; content: string };
@@ -25,22 +27,30 @@ export type ToolRow = {
 export type ChatRow = UserRow | AssistantRow | ToolRow;
 
 export type SubmitOutcome = 'sent' | 'empty' | 'busy' | 'no-model';
+export type CompactOutcome = 'compacted' | 'too-short' | 'no-model' | 'busy' | 'error';
 
 type Target = { provider: CatalogProvider; ref: ModelRef };
 
 export type UseChatOptions = {
   seedRows?: ChatRow[];
+  seedCompactionPoint?: CompactionPoint | null;
   onCommit?: (row: ChatRow) => void;
+  onCompact?: (cp: CompactionPoint) => void;
 };
 
+const KEEP_TAIL_ROWS = 6;
+
 export function useChat(target: Target | null, approver: Approver, opts: UseChatOptions = {}) {
-  const { onCommit } = opts;
+  const { onCommit, onCompact } = opts;
   // scrollback: monotonically growing; rendered via Ink <Static> so it lands in
   // terminal scrollback and never re-renders.
   // live: actively mutating (current turn). Re-renders on every event.
   const [scrollback, setScrollback] = useState<ChatRow[]>(opts.seedRows ?? []);
   const [live, setLive] = useState<ChatRow[]>([]);
   const [streaming, setStreaming] = useState(false);
+  const [compactionPoint, setCompactionPoint] = useState<CompactionPoint | null>(
+    opts.seedCompactionPoint ?? null,
+  );
   const abortRef = useRef<AbortController | null>(null);
   const idRef = useRef(maxIdOf(opts.seedRows ?? []));
   const committedIdsRef = useRef<Set<number>>(new Set((opts.seedRows ?? []).map((r) => r.id)));
@@ -55,17 +65,25 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
   // Switch sessions: append loaded rows to scrollback (they print to terminal
   // history below whatever was already there) and clear live. Past sessions
   // remain visible above in scrollback.
-  const reset = useCallback((newRows: ChatRow[]) => {
-    setScrollback((prev) => [...prev, ...newRows]);
-    setLive([]);
-    committedIdsRef.current = new Set([...committedIdsRef.current, ...newRows.map((r) => r.id)]);
-    const max = maxIdOf(newRows);
-    if (max > idRef.current) idRef.current = max;
-  }, []);
+  const reset = useCallback(
+    (load: { rows: ChatRow[]; compactionPoint: CompactionPoint | null }) => {
+      setScrollback((prev) => [...prev, ...load.rows]);
+      setLive([]);
+      setCompactionPoint(load.compactionPoint);
+      committedIdsRef.current = new Set([
+        ...committedIdsRef.current,
+        ...load.rows.map((r) => r.id),
+      ]);
+      const max = maxIdOf(load.rows);
+      if (max > idRef.current) idRef.current = max;
+    },
+    [],
+  );
 
   // /new and /clear: just clear the live area; scrollback stays printed.
   const clear = useCallback(() => {
     setLive([]);
+    setCompactionPoint(null);
   }, []);
 
   const send = useCallback(
@@ -82,7 +100,9 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
         kind: 'assistant',
         content: '',
       };
-      const baseHistory = [...messages, userMsg];
+      const activeCp = compactionPoint;
+      const visibleHistory = activeCp ? messages.filter((r) => r.id > activeCp.afterId) : messages;
+      const baseHistory = [...visibleHistory, userMsg];
       setLive((prev) => [...prev, userMsg, initialAssistant]);
       setStreaming(true);
       committedIdsRef.current.add(userMsg.id);
@@ -104,6 +124,7 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
         for await (const ev of streamChat(target.provider, target.ref, baseHistory, {
           signal: controller.signal,
           approver,
+          ...(activeCp ? { system: `Summary of earlier conversation:\n${activeCp.summary}` } : {}),
         })) {
           switch (ev.type) {
             case 'text-delta': {
@@ -195,8 +216,6 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
       } finally {
         setStreaming(false);
         abortRef.current = null;
-        // Promote the entire turn from live to scrollback (so Ink <Static>
-        // commits it to terminal history). Drop trailing empty assistant.
         setLive((current) => {
           const trimmed = trimEmptyTrailingAssistant(current);
           for (const row of trimmed) {
@@ -210,10 +229,63 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
       }
       return 'sent';
     },
-    [messages, streaming, target, approver, nextId, onCommit],
+    [messages, streaming, target, approver, nextId, onCommit, compactionPoint],
   );
 
-  return { messages, scrollback, live, streaming, send, clear, cancel, reset };
+  const compact = useCallback(async (): Promise<CompactOutcome> => {
+    if (streaming) return 'busy';
+    if (!target) return 'no-model';
+    const activeCp = compactionPoint;
+    const sourceRows = activeCp ? messages.filter((r) => r.id > activeCp.afterId) : messages;
+    if (sourceRows.length <= KEEP_TAIL_ROWS) return 'too-short';
+    const toSummarize = sourceRows.slice(0, sourceRows.length - KEEP_TAIL_ROWS);
+    const lastSummarized = toSummarize[toSummarize.length - 1];
+    if (!lastSummarized) return 'too-short';
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setStreaming(true);
+    try {
+      const contextForSummary = activeCp
+        ? [
+            {
+              id: 0,
+              kind: 'assistant' as const,
+              content: `Previously summarized context:\n${activeCp.summary}`,
+            },
+            ...toSummarize,
+          ]
+        : toSummarize;
+      const summary = await summarizeRows(
+        contextForSummary,
+        target.provider,
+        target.ref,
+        controller.signal,
+      );
+      if (!summary) return 'error';
+      const cp: CompactionPoint = { afterId: lastSummarized.id, summary };
+      setCompactionPoint(cp);
+      onCompact?.(cp);
+      return 'compacted';
+    } catch {
+      return 'error';
+    } finally {
+      setStreaming(false);
+      abortRef.current = null;
+    }
+  }, [messages, compactionPoint, target, streaming, onCompact]);
+
+  return {
+    messages,
+    scrollback,
+    live,
+    streaming,
+    compactionPoint,
+    send,
+    clear,
+    cancel,
+    reset,
+    compact,
+  };
 }
 
 function maxIdOf(rows: ChatRow[]): number {
