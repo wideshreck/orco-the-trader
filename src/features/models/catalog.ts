@@ -3,9 +3,15 @@ import os from 'node:os';
 import path from 'node:path';
 
 const CATALOG_URL = 'https://models.dev/api.json';
-const CACHE_DIR = path.join(os.homedir(), '.cache', 'orco');
-const CACHE_PATH = path.join(CACHE_DIR, 'models.json');
 const TTL_MS = 60 * 60 * 1000;
+
+function cacheDir(): string {
+  return path.join(os.homedir(), '.cache', 'orco');
+}
+
+function cachePath(): string {
+  return path.join(cacheDir(), 'models.json');
+}
 
 export type ModelModalities = { input: string[]; output: string[] };
 export type ModelCost = {
@@ -81,7 +87,7 @@ function parseCatalog(raw: unknown): Catalog {
 
 function readCache(): CacheFile | null {
   try {
-    const raw = JSON.parse(fs.readFileSync(CACHE_PATH, 'utf8')) as unknown;
+    const raw = JSON.parse(fs.readFileSync(cachePath(), 'utf8')) as unknown;
     if (!isObject(raw)) return null;
     if (typeof raw.fetchedAt !== 'number') return null;
     const data = parseCatalog(raw.data);
@@ -92,11 +98,12 @@ function readCache(): CacheFile | null {
 }
 
 function writeCache(data: Catalog): void {
-  fs.mkdirSync(CACHE_DIR, { recursive: true });
+  fs.mkdirSync(cacheDir(), { recursive: true });
   const payload: CacheFile = { fetchedAt: Date.now(), data };
-  const tmp = `${CACHE_PATH}.tmp`;
+  const file = cachePath();
+  const tmp = `${file}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(payload));
-  fs.renameSync(tmp, CACHE_PATH);
+  fs.renameSync(tmp, file);
 }
 
 async function fetchCatalog(signal?: AbortSignal): Promise<Catalog> {

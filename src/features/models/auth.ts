@@ -2,8 +2,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const AUTH_DIR = path.join(os.homedir(), '.config', 'orco');
-const AUTH_PATH = path.join(AUTH_DIR, 'auth.json');
+function authDir(): string {
+  return path.join(os.homedir(), '.config', 'orco');
+}
+
+function authPath(): string {
+  return path.join(authDir(), 'auth.json');
+}
 
 export type ApiKeyAuth = { type: 'api'; key: string };
 export type OAuthAuth = {
@@ -35,7 +40,7 @@ function parseEntry(raw: unknown): AuthEntry | null {
 
 function readStore(): AuthStore {
   try {
-    const raw = JSON.parse(fs.readFileSync(AUTH_PATH, 'utf8')) as unknown;
+    const raw = JSON.parse(fs.readFileSync(authPath(), 'utf8')) as unknown;
     if (!isObject(raw)) return {};
     const out: AuthStore = {};
     for (const [k, v] of Object.entries(raw)) {
@@ -49,10 +54,11 @@ function readStore(): AuthStore {
 }
 
 function writeStore(store: AuthStore): void {
-  fs.mkdirSync(AUTH_DIR, { recursive: true, mode: 0o700 });
-  const tmp = `${AUTH_PATH}.tmp`;
+  fs.mkdirSync(authDir(), { recursive: true, mode: 0o700 });
+  const file = authPath();
+  const tmp = `${file}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(store, null, 2), { mode: 0o600 });
-  fs.renameSync(tmp, AUTH_PATH);
+  fs.renameSync(tmp, file);
 }
 
 export function setAuth(providerId: string, entry: AuthEntry): void {

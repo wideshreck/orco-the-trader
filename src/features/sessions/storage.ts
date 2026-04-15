@@ -9,24 +9,29 @@ import {
   type SessionMeta,
 } from './types.js';
 
-const ROOT = path.join(os.homedir(), '.config', 'orco', 'sessions');
-const INDEX_PATH = path.join(ROOT, 'index.json');
+function rootDir(): string {
+  return path.join(os.homedir(), '.config', 'orco', 'sessions');
+}
+
+function indexPath(): string {
+  return path.join(rootDir(), 'index.json');
+}
 
 function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
 function sessionPath(id: SessionId): string {
-  return path.join(ROOT, `${id}.jsonl`);
+  return path.join(rootDir(), `${id}.jsonl`);
 }
 
 function ensureDir(): void {
-  fs.mkdirSync(ROOT, { recursive: true });
+  fs.mkdirSync(rootDir(), { recursive: true });
 }
 
 export function readIndex(): SessionIndex {
   try {
-    const raw = JSON.parse(fs.readFileSync(INDEX_PATH, 'utf8')) as unknown;
+    const raw = JSON.parse(fs.readFileSync(indexPath(), 'utf8')) as unknown;
     if (!isObject(raw) || !Array.isArray(raw.sessions)) return { v: 1, sessions: [] };
     const sessions: SessionMeta[] = [];
     for (const s of raw.sessions) {
@@ -60,9 +65,10 @@ export function writeIndex(idx: SessionIndex): void {
     .sort((a, b) => b.lastModified - a.lastModified)
     .slice(0, MAX_INDEX_ENTRIES);
   const payload: SessionIndex = { v: 1, sessions: sorted };
-  const tmp = `${INDEX_PATH}.tmp`;
+  const file = indexPath();
+  const tmp = `${file}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(payload, null, 2));
-  fs.renameSync(tmp, INDEX_PATH);
+  fs.renameSync(tmp, file);
 }
 
 export function appendEvent(id: SessionId, ev: SessionEvent): void {
@@ -116,7 +122,7 @@ export function reconcile(): void {
   const idx = readIndex();
   const present = new Set<string>();
   try {
-    for (const f of fs.readdirSync(ROOT)) {
+    for (const f of fs.readdirSync(rootDir())) {
       if (f.endsWith('.jsonl')) present.add(f.slice(0, -6));
     }
   } catch {

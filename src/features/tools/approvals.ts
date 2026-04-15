@@ -2,8 +2,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const APPROVALS_DIR = path.join(os.homedir(), '.config', 'orco');
-const APPROVALS_PATH = path.join(APPROVALS_DIR, 'approvals.json');
+function approvalsDir(): string {
+  return path.join(os.homedir(), '.config', 'orco');
+}
+
+function approvalsPath(): string {
+  return path.join(approvalsDir(), 'approvals.json');
+}
 
 type Persisted = {
   always: Record<string, boolean>;
@@ -15,7 +20,7 @@ function isObject(v: unknown): v is Record<string, unknown> {
 
 function read(): Persisted {
   try {
-    const raw = JSON.parse(fs.readFileSync(APPROVALS_PATH, 'utf8')) as unknown;
+    const raw = JSON.parse(fs.readFileSync(approvalsPath(), 'utf8')) as unknown;
     if (!isObject(raw) || !isObject(raw.always)) return { always: {} };
     const always: Record<string, boolean> = {};
     for (const [k, v] of Object.entries(raw.always)) {
@@ -28,10 +33,11 @@ function read(): Persisted {
 }
 
 function write(data: Persisted): void {
-  fs.mkdirSync(APPROVALS_DIR, { recursive: true });
-  const tmp = `${APPROVALS_PATH}.tmp`;
+  fs.mkdirSync(approvalsDir(), { recursive: true });
+  const file = approvalsPath();
+  const tmp = `${file}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
-  fs.renameSync(tmp, APPROVALS_PATH);
+  fs.renameSync(tmp, file);
 }
 
 export function isAlwaysAllowed(toolName: string): boolean {
