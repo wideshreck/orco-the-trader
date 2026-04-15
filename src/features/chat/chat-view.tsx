@@ -60,6 +60,11 @@ export function ChatView(props: {
   // the agent is asking a question so keystrokes go to the question prompt.
   const inputActive = focus === 'input' && !approval && !question;
   const questionInputActive = question !== null && !question.choices;
+  // Hide pre-tool assistant rows (no text content, just triggered a tool call).
+  // They would render as "‹ orco" headers with only a usage footer — noisy.
+  const visibleScrollback = scrollback.filter(
+    (r) => !(r.kind === 'assistant' && !r.content && !r.error),
+  );
   const totalTokens = sumTokens([...scrollback, ...live]);
   const lastInputTokens = lastTurnInput([...scrollback, ...live]);
   const { contextLimit, compactionActive } = props;
@@ -73,7 +78,7 @@ export function ChatView(props: {
     <>
       {/* Static prints each row exactly once and commits it to terminal scrollback.
           Past turns scroll up out of the dynamic area so native terminal scroll works. */}
-      <Static items={scrollback}>
+      <Static items={visibleScrollback}>
         {(row) => <ChatRowView key={row.id} row={row} formatUsage={props.formatUsage} />}
       </Static>
 
@@ -84,6 +89,10 @@ export function ChatView(props: {
           )}
           {live.map((msg, i) => {
             const isLastAssistant = msg.kind === 'assistant' && i === live.length - 1 && streaming;
+            // Same filter as scrollback: drop empty non-active assistant rows.
+            if (msg.kind === 'assistant' && !msg.content && !msg.error && !isLastAssistant) {
+              return null;
+            }
             return (
               <ChatRowView
                 key={msg.id}
