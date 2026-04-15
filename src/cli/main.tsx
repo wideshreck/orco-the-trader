@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import process from 'node:process';
 import { render } from 'ink';
 import { App } from '../app/app.js';
+import { shutdownMcp } from '../features/mcp/index.js';
 import { printBannerToStdout } from '../shared/ui/banner.js';
 
 function fatal(prefix: string, err: unknown): void {
@@ -29,7 +30,7 @@ const SIGNAL_EXIT_CODES: Record<'SIGINT' | 'SIGTERM' | 'SIGHUP', number> = {
 
 for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
   process.on(sig, () => {
-    process.exit(SIGNAL_EXIT_CODES[sig]);
+    void shutdownMcp().finally(() => process.exit(SIGNAL_EXIT_CODES[sig]));
   });
 }
 
@@ -45,4 +46,6 @@ process.on('unhandledRejection', (reason) => {
 
 const app = render(<App />, { exitOnCtrlC: false });
 
-void app.waitUntilExit();
+void app.waitUntilExit().finally(() => {
+  void shutdownMcp();
+});

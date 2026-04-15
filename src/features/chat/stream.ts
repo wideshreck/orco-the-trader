@@ -1,4 +1,5 @@
 import { stepCountIs, streamText } from 'ai';
+import { getMcpTools } from '../mcp/index.js';
 import { getApiKey } from '../models/auth.js';
 import type { CatalogProvider, ModelRef } from '../models/catalog.js';
 import { resolveModel } from '../models/providers.js';
@@ -29,7 +30,9 @@ export async function* streamChat(
   });
 
   const modelMessages = chatRowsToModelMessages(rows);
-  const tools = buildAiSdkTools({ approver: opts.approver, signal: opts.signal });
+  const nativeTools = buildAiSdkTools({ approver: opts.approver, signal: opts.signal });
+  const mcpTools = getMcpTools(opts.approver);
+  const tools = { ...nativeTools, ...mcpTools };
 
   const result = streamText({
     model,

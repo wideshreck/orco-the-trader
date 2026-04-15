@@ -4,6 +4,7 @@ import { isKnownCommand, SLASH_COMMANDS } from '../commands/index.js';
 import type { InfoPanel } from '../features/chat/chat-view.js';
 import { computeCost, formatTokens, formatUsd } from '../features/chat/cost.js';
 import type { ChatRow } from '../features/chat/use-chat.js';
+import { listMcpServers } from '../features/mcp/index.js';
 import type { Catalog, ModelRef } from '../features/models/catalog.js';
 import { listSkills, skillsDir } from '../features/skills/index.js';
 import { listActive, listAlwaysAllowed } from '../features/tools/index.js';
@@ -57,6 +58,28 @@ export function dispatchCommand(trimmed: string, ctx: DispatchCtx): DispatchResu
   }
   if (trimmed === '/compact') {
     ctx.compactChat();
+    return 'handled';
+  }
+  if (trimmed === '/mcp') {
+    const servers = listMcpServers();
+    if (servers.length === 0) {
+      ctx.setInfoPanel({
+        title: 'mcp',
+        lines: [
+          '  (no MCP servers configured)',
+          '  add them under "mcpServers" in ~/.config/orco/config.json',
+        ],
+      });
+    } else {
+      const lines = servers.map((s) => {
+        if (s.status.state === 'ready')
+          return `  ✓ ${s.name.padEnd(16)} ready · ${s.status.toolCount} tools  ${s.config.url}`;
+        if (s.status.state === 'connecting')
+          return `  … ${s.name.padEnd(16)} connecting  ${s.config.url}`;
+        return `  ✗ ${s.name.padEnd(16)} failed: ${s.status.error}`;
+      });
+      ctx.setInfoPanel({ title: 'mcp servers', lines });
+    }
     return 'handled';
   }
   if (trimmed === '/skills') {

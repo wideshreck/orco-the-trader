@@ -4,6 +4,7 @@ import { matchCommands } from '../commands/index.js';
 import { type ChatFocus, ChatView, type InfoPanel } from '../features/chat/chat-view.js';
 import { computeCost, formatUsageLine } from '../features/chat/cost.js';
 import { useChat } from '../features/chat/use-chat.js';
+import { bootstrapMcp } from '../features/mcp/index.js';
 import { isAuthenticated } from '../features/models/auth.js';
 import { AuthPrompt } from '../features/models/auth-prompt.js';
 import { type Catalog, findModel, loadCatalog, type ModelRef } from '../features/models/catalog.js';
@@ -76,6 +77,9 @@ export function App() {
     let cancelled = false;
     (async () => {
       try {
+        // MCP servers connect in parallel with the catalog load; failures are
+        // recorded per-server and the app proceeds without them.
+        void bootstrapMcp(config.mcpServers);
         const { catalog: cat } = await loadCatalog();
         if (cancelled) return;
         setCatalog(cat);
@@ -99,7 +103,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [config.modelId, config.providerId]);
+  }, [config.modelId, config.providerId, config.mcpServers]);
 
   useInput((ch, key) => {
     if (key.ctrl && ch === 'c') {
