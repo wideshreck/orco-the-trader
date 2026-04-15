@@ -1,24 +1,25 @@
 import { Box, Text } from 'ink';
 import type { ToolRow } from './use-chat.js';
 
-const PREVIEW_LIMIT = 200;
+const INPUT_PREVIEW = 70;
+const OUTPUT_PREVIEW = 140;
 
 export function ToolCallView(props: { row: ToolRow }) {
   const { row } = props;
   const icon = iconFor(row.status);
   const color = colorFor(row.status);
-  const inputPreview = preview(row.input);
+  const inputPreview = preview(row.input, INPUT_PREVIEW);
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Box>
         <Text color={color} bold>
           {icon} {row.name}
         </Text>
-        <Text dimColor>({inputPreview})</Text>
+        {inputPreview && <Text dimColor> {inputPreview}</Text>}
       </Box>
       {row.status === 'done' && row.output !== undefined && (
         <Box paddingLeft={2}>
-          <Text dimColor>→ {preview(row.output)}</Text>
+          <Text dimColor>→ {preview(row.output, OUTPUT_PREVIEW)}</Text>
         </Box>
       )}
       {(row.status === 'error' || row.status === 'denied') && row.error && (
@@ -69,12 +70,17 @@ function colorFor(status: ToolRow['status']): 'cyan' | 'green' | 'red' | 'yellow
   }
 }
 
-function preview(value: unknown): string {
+/** Single-line preview of a JSON-ish value. Collapses whitespace and shows
+ * just the first/last few chars of any long array so the row always fits one
+ * visual line regardless of terminal width. */
+function preview(value: unknown, limit: number): string {
+  if (value === null || value === undefined) return '';
   try {
-    const s = typeof value === 'string' ? value : JSON.stringify(value);
+    const s = typeof value === 'string' ? value : JSON.stringify(value, null, 0);
     if (!s) return '';
-    if (s.length <= PREVIEW_LIMIT) return s;
-    return `${s.slice(0, PREVIEW_LIMIT)}... (${s.length - PREVIEW_LIMIT} more)`;
+    const oneLine = s.replace(/\s+/g, ' ');
+    if (oneLine.length <= limit) return oneLine;
+    return `${oneLine.slice(0, limit)}… +${oneLine.length - limit}`;
   } catch {
     return String(value);
   }
