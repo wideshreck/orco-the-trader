@@ -93,9 +93,9 @@ Provider/model eşlemesi `src/models.ts`'deki `resolveModel` switch'inde. Yeni p
 ## 4. Hata Yönetimi
 
 ### Kullanıcıya dönen hatalar
-- Kısa, eyleme çevrilebilir, **Türkçe** (UI dili TR).
+- Kısa, eyleme çevrilebilir, **İngilizce** (UI dili EN).
 - Stack trace UI'a dökme.
-- Örnek: `ANTHROPIC_API_KEY bulunamadı. Ortam değişkenini set et ve tekrar dene.`
+- Örnek: `ANTHROPIC_API_KEY not found. Set the environment variable and try again.`
 
 ### İç hatalar
 - `try/catch` **sadece** stream/IO sınırında (net, fs, fetch).
@@ -169,9 +169,10 @@ Proje dizinine config/cache yazma. Sadece home dir.
 
 | Komut | Ne zaman |
 |-------|----------|
+| `npm run check` | **Her commit öncesi zorunlu** (biome lint+format + tsc --noEmit) |
 | `npm run build` | Her yapısal değişiklikten sonra, PR öncesi zorunlu |
 | `npm run dev` | UI değişikliklerinde elle deneme |
-| `node --input-type=module -e "import('./dist/cli.js')"` | Build çıktısının ESM'de çözülmesini doğrula |
+| `node --input-type=module -e "import('./dist/cli.js')"` | Build çıktısının ESM'de çözülmesini doğrula (TTY guard "requires interactive terminal" yazıp çıkmalı) |
 
 **"TypeScript derledi" ≠ "çalışıyor".** UI değişikliğinde `npm run dev` ile en az şu akışları dene:
 1. Mesaj gönder + stream'i izle
@@ -183,7 +184,7 @@ Proje dizinine config/cache yazma. Sadece home dir.
 
 Bir akış denenmediyse, "çalışıyor" **deme**.
 
-Lint/format aracı henüz yok. Kurmak istiyorsan önce sor.
+**Lint/format:** Biome 2.x kurulu. `npm run check` zorunlu doğrulama adımı (biome + tsc).
 
 ---
 
@@ -216,15 +217,21 @@ Lint/format aracı henüz yok. Kurmak istiyorsan önce sor.
 ## 11. Mimari Katmanlar (Şu Anki + Hedef)
 
 ```
-cli.tsx      → render bootstrap, alt-screen buffer
- └─ app.tsx  → UI state, input handling, komutlar (/model, /clear)
-     ├─ models.ts   → provider/model registry + resolveModel
-     ├─ ai.ts       → streaming soyutlaması (UI buna bağlı, SDK'ya bağlı değil)
-     ├─ config.ts   → persistent user config
-     └─ catalog.ts  → models.dev cache (1h TTL + stale fallback)
+cli.tsx              → render bootstrap, alt-screen + signal cleanup (SIGINT/TERM/HUP/uncaught/unhandled)
+ └─ app.tsx          → phase routing, top-level useInput, command dispatch (/model /clear /exit)
+     ├─ app/
+     │   ├─ chat-view.tsx → presentational (banner + messages + input + tools bar)
+     │   ├─ use-chat.ts   → streaming hook + abort + message state
+     │   └─ banner.tsx    → ASCII logo (tek kaynak)
+     ├─ ai.ts         → streamChat soyutlaması (AbortSignal zorunlu)
+     ├─ providers.ts  → ProviderId union + factory map + UnsupportedProviderError
+     ├─ catalog.ts    → models.dev cache (1h TTL + stale fallback) + runtime şema doğrulaması
+     ├─ config.ts     → persistent user config (atomic write)
+     ├─ auth.ts       → api key store (atomic write, 0600)
+     └─ errors.ts     → isAbortError, errorMessage
 ```
 
-**Bağımlılık yönü:** UI → ai.ts → models.ts → SDK. Ters yönlü import yasak. `models.ts` Ink import etmez. `ai.ts` React import etmez.
+**Bağımlılık yönü:** UI → ai.ts → providers.ts → SDK. Ters yönlü import yasak. `providers.ts` Ink import etmez. `ai.ts` React import etmez. `errors.ts` hiç bir şey import etmez (yardımcı saf fonksiyonlar).
 
 Tool-calling eklenirken:
 - `src/tools/` dizini aç, her tool ayrı dosya.
@@ -240,8 +247,7 @@ Bu yapı değişikliği gerektiren bir feature önerirken önce tasarımı yaz, 
 Bunlar şu an eksik, eklerken uyar/yapma:
 
 - Test altyapısı yok (Vitest öneri, ama önce sor).
-- Logger yok (`console.*` Ink'i bozar — Ink `<Text>` veya stderr'e yaz).
-- Yapılandırma doğrulaması yok (config.json bozulursa default'a düşer, bu şimdilik kabul).
+- Logger yok (`console.*` Ink'i bozar — Ink `<Text>` veya `fs.writeSync(stderr.fd, ...)` kullan).
 - Tool-calling yok, sistem prompt'u yok, memory yok.
 
 ---
