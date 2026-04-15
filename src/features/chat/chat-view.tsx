@@ -1,7 +1,6 @@
-import { Box, Text } from 'ink';
+import { Box, Static, Text } from 'ink';
 import TextInput from 'ink-text-input';
 import type { SlashCommand } from '../../commands/index.js';
-import { Banner } from '../../shared/ui/banner.js';
 import { renderMarkdown } from '../../shared/ui/markdown.js';
 import { ApprovalPrompt } from '../tools/approval-prompt.js';
 import type { ApprovalRequest } from '../tools/index.js';
@@ -15,7 +14,8 @@ export type InfoPanel = { title: string; lines: string[] };
 export function ChatView(props: {
   modelLabel: string;
   sessionLabel: string;
-  messages: ChatRow[];
+  scrollback: ChatRow[];
+  live: ChatRow[];
   streaming: boolean;
   input: string;
   onInputChange: (v: string) => void;
@@ -30,7 +30,8 @@ export function ChatView(props: {
   const {
     modelLabel,
     sessionLabel,
-    messages,
+    scrollback,
+    live,
     streaming,
     input,
     focus,
@@ -42,49 +43,24 @@ export function ChatView(props: {
   } = props;
   const showSuggestions = focus === 'input' && !streaming && !approval && suggestions.length > 0;
   const inputActive = focus === 'input' && !streaming && !approval;
+
   return (
-    <Box flexDirection="column" padding={1}>
-      <Box flexDirection="column" marginBottom={1}>
-        <Banner
-          subtitle={
-            <Box>
-              <Text dimColor>The Trader v0.1 · </Text>
-              <Text color="magenta">{modelLabel}</Text>
-              <Text dimColor> · </Text>
-              <Text color="cyan">{truncateLabel(sessionLabel)}</Text>
-            </Box>
-          }
-        />
-      </Box>
+    <>
+      {/* Static prints each row exactly once and commits it to terminal scrollback.
+          Past turns scroll up out of the dynamic area so native terminal scroll works. */}
+      <Static items={scrollback}>{(row) => <ChatRowView key={row.id} row={row} />}</Static>
 
-      <Box flexDirection="column" marginBottom={1}>
-        {messages.length === 0 && (
-          <Text dimColor>Type a message and press enter · /model select model · /clear reset</Text>
-        )}
-        {messages.map((msg, i) => {
-          if (msg.kind === 'tool') return <ToolCallView key={msg.id} row={msg} />;
-          const isLastAssistant =
-            msg.kind === 'assistant' && i === messages.length - 1 && streaming;
-          return (
-            <Box key={msg.id} flexDirection="column" marginBottom={1}>
-              <Text color={msg.kind === 'user' ? 'green' : 'magenta'} bold>
-                {msg.kind === 'user' ? '› you' : '‹ orco'}
-              </Text>
-              {msg.kind === 'assistant' && msg.error ? (
-                <Text color="red">{msg.content}</Text>
-              ) : msg.kind === 'assistant' ? (
-                <Text>
-                  {msg.content ? renderMarkdown(msg.content) : isLastAssistant ? '…' : ''}
-                </Text>
-              ) : (
-                <Text>{msg.content}</Text>
-              )}
-            </Box>
-          );
-        })}
-      </Box>
+      <Box flexDirection="column" paddingX={1}>
+        <Box flexDirection="column" marginBottom={live.length > 0 ? 1 : 0}>
+          {live.length === 0 && scrollback.length === 0 && (
+            <Text dimColor>type a message and press enter · /help for commands</Text>
+          )}
+          {live.map((msg, i) => {
+            const isLastAssistant = msg.kind === 'assistant' && i === live.length - 1 && streaming;
+            return <ChatRowView key={msg.id} row={msg} placeholder={isLastAssistant ? '…' : ''} />;
+          })}
+        </Box>
 
-      <Box flexDirection="column">
         {approval && <ApprovalPrompt request={approval} />}
         {infoPanel && (
           <Box
@@ -102,18 +78,12 @@ export function ChatView(props: {
               <Text key={line}>{line}</Text>
             ))}
             <Box marginTop={1}>
-              <Text dimColor>press any key to dismiss</Text>
+              <Text dimColor>press esc · enter · space to dismiss</Text>
             </Box>
           </Box>
         )}
         {showSuggestions && (
-          <Box
-            flexDirection="column"
-            borderStyle="round"
-            borderColor="cyan"
-            paddingX={1}
-            marginBottom={0}
-          >
+          <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
             {suggestions.map((cmd, i) => {
               const selected = i === suggestionIdx;
               return (
@@ -134,10 +104,11 @@ export function ChatView(props: {
               );
             })}
             <Box marginTop={1}>
-              <Text dimColor>↑↓ navigate · tab complete · esc clear</Text>
+              <Text dimColor>↑↓ navigate · tab complete · esc dismiss</Text>
             </Box>
           </Box>
         )}
+
         <Box
           borderStyle="round"
           borderColor={focus === 'input' && input.length > 0 ? 'cyan' : 'gray'}
@@ -152,7 +123,7 @@ export function ChatView(props: {
                 value={input}
                 onChange={props.onInputChange}
                 onSubmit={props.onSubmit}
-                placeholder="ask orco anything... (/model, /clear)"
+                placeholder="ask orco anything... (/help)"
                 showCursor
               />
             ) : (
@@ -167,27 +138,19 @@ export function ChatView(props: {
           </Box>
         </Box>
 
-        <Box paddingX={2} justifyContent="space-between">
+        <Box paddingX={1} justifyContent="space-between">
           <Box>
-            {focus === 'tools-bar' ? (
-              <Text color="cyan" inverse>
-                {' tools '}
-              </Text>
-            ) : (
-              <Text dimColor>tools</Text>
+            <Text dimColor>{modelLabel}</Text>
+            <Text dimColor> · </Text>
+            <Text dimColor>{truncateLabel(sessionLabel)}</Text>
+            {focus === 'tools-bar' && (
+              <Text dimColor>{'  '}(↓ tools-bar focused · enter open · esc back)</Text>
             )}
-            <Text dimColor>
-              {focus === 'input'
-                ? '  (↓ to focus)'
-                : focus === 'tools-bar'
-                  ? '  (enter to open · esc to close)'
-                  : ''}
-            </Text>
           </Box>
           {exitWarning ? (
             <Text color="yellow">press ctrl+c again to exit</Text>
           ) : (
-            <Text dimColor>/model · ctrl+c to exit</Text>
+            <Text dimColor>ctrl+c to exit</Text>
           )}
         </Box>
 
@@ -212,6 +175,25 @@ export function ChatView(props: {
           </Box>
         )}
       </Box>
+    </>
+  );
+}
+
+function ChatRowView(props: { row: ChatRow; placeholder?: string }) {
+  const { row, placeholder = '' } = props;
+  if (row.kind === 'tool') return <ToolCallView row={row} />;
+  return (
+    <Box flexDirection="column" marginBottom={1}>
+      <Text color={row.kind === 'user' ? 'green' : 'magenta'} bold>
+        {row.kind === 'user' ? '› you' : '‹ orco'}
+      </Text>
+      {row.kind === 'assistant' && row.error ? (
+        <Text color="red">{row.content}</Text>
+      ) : row.kind === 'assistant' ? (
+        <Text>{row.content ? renderMarkdown(row.content) : placeholder}</Text>
+      ) : (
+        <Text>{row.content}</Text>
+      )}
     </Box>
   );
 }

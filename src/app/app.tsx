@@ -264,7 +264,8 @@ export function App() {
     <ChatView
       modelLabel={modelLabel}
       sessionLabel={sessionLabel}
-      messages={chat.messages}
+      scrollback={chat.scrollback}
+      live={chat.live}
       streaming={chat.streaming}
       input={input}
       onInputChange={setInput}

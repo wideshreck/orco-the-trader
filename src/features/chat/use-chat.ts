@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { errorMessage, isAbortError } from '../../shared/errors/index.js';
 import type { CatalogProvider, ModelRef } from '../models/catalog.js';
 import type { Approver } from '../tools/index.js';
@@ -34,27 +34,37 @@ export type UseChatOptions = {
 
 export function useChat(target: Target | null, approver: Approver, opts: UseChatOptions = {}) {
   const { onCommit } = opts;
-  const [messages, setMessages] = useState<ChatRow[]>(opts.seedRows ?? []);
+  // scrollback: monotonically growing; rendered via Ink <Static> so it lands in
+  // terminal scrollback and never re-renders.
+  // live: actively mutating (current turn). Re-renders on every event.
+  const [scrollback, setScrollback] = useState<ChatRow[]>(opts.seedRows ?? []);
+  const [live, setLive] = useState<ChatRow[]>([]);
   const [streaming, setStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const idRef = useRef(maxIdOf(opts.seedRows ?? []));
   const committedIdsRef = useRef<Set<number>>(new Set((opts.seedRows ?? []).map((r) => r.id)));
   const nextId = useCallback(() => ++idRef.current, []);
 
+  const messages = useMemo(() => [...scrollback, ...live], [scrollback, live]);
+
   useEffect(() => () => abortRef.current?.abort(), []);
 
   const cancel = useCallback(() => abortRef.current?.abort(), []);
 
+  // Switch sessions: append loaded rows to scrollback (they print to terminal
+  // history below whatever was already there) and clear live. Past sessions
+  // remain visible above in scrollback.
   const reset = useCallback((newRows: ChatRow[]) => {
-    setMessages(newRows);
-    committedIdsRef.current = new Set(newRows.map((r) => r.id));
+    setScrollback((prev) => [...prev, ...newRows]);
+    setLive([]);
+    committedIdsRef.current = new Set([...committedIdsRef.current, ...newRows.map((r) => r.id)]);
     const max = maxIdOf(newRows);
     if (max > idRef.current) idRef.current = max;
   }, []);
 
+  // /new and /clear: just clear the live area; scrollback stays printed.
   const clear = useCallback(() => {
-    setMessages([]);
-    committedIdsRef.current = new Set();
+    setLive([]);
   }, []);
 
   const send = useCallback(
@@ -72,7 +82,7 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
         content: '',
       };
       const baseHistory = [...messages, userMsg];
-      setMessages([...baseHistory, initialAssistant]);
+      setLive((prev) => [...prev, userMsg, initialAssistant]);
       setStreaming(true);
       committedIdsRef.current.add(userMsg.id);
       onCommit?.(userMsg);
@@ -93,7 +103,7 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
               assistantAcc += ev.delta;
               const captured = assistantAcc;
               const targetId = activeAssistantId;
-              setMessages((prev) =>
+              setLive((prev) =>
                 prev.map((r) =>
                   r.id === targetId && r.kind === 'assistant' ? { ...r, content: captured } : r,
                 ),
@@ -112,7 +122,7 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
               const newAssistantId = nextId();
               activeAssistantId = newAssistantId;
               assistantAcc = '';
-              setMessages((prev) => [
+              setLive((prev) => [
                 ...prev,
                 row,
                 { id: newAssistantId, kind: 'assistant', content: '' },
@@ -120,7 +130,7 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
               break;
             }
             case 'approval-request': {
-              setMessages((prev) =>
+              setLive((prev) =>
                 prev.map((r) =>
                   r.kind === 'tool' && r.toolCallId === ev.toolCallId
                     ? { ...r, status: 'awaiting-approval' }
@@ -130,7 +140,7 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
               break;
             }
             case 'tool-result': {
-              setMessages((prev) =>
+              setLive((prev) =>
                 prev.map((r) =>
                   r.kind === 'tool' && r.toolCallId === ev.toolCallId
                     ? { ...r, output: ev.output, status: 'done' }
@@ -141,7 +151,7 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
             }
             case 'tool-error': {
               const denied = ev.error === 'denied by user';
-              setMessages((prev) =>
+              setLive((prev) =>
                 prev.map((r) =>
                   r.kind === 'tool' && r.toolCallId === ev.toolCallId
                     ? { ...r, error: ev.error, status: denied ? 'denied' : 'error' }
@@ -156,7 +166,7 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
         const aborted = isAbortError(err);
         const errText = aborted ? '(canceled)' : `Error: ${errorMessage(err)}`;
         const targetId = activeAssistantId;
-        setMessages((prev) =>
+        setLive((prev) =>
           prev.map((r) => {
             if (r.id !== targetId || r.kind !== 'assistant') return r;
             const next: AssistantRow = { ...r, content: errText };
@@ -167,14 +177,17 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
       } finally {
         setStreaming(false);
         abortRef.current = null;
-        setMessages((prev) => {
-          const trimmed = trimEmptyTrailingAssistant(prev);
+        // Promote the entire turn from live to scrollback (so Ink <Static>
+        // commits it to terminal history). Drop trailing empty assistant.
+        setLive((current) => {
+          const trimmed = trimEmptyTrailingAssistant(current);
           for (const row of trimmed) {
             if (committedIdsRef.current.has(row.id)) continue;
             committedIdsRef.current.add(row.id);
             onCommit?.(row);
           }
-          return trimmed;
+          setScrollback((prev) => [...prev, ...trimmed]);
+          return [];
         });
       }
       return 'sent';
@@ -182,7 +195,7 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
     [messages, streaming, target, approver, nextId, onCommit],
   );
 
-  return { messages, streaming, send, clear, cancel, reset };
+  return { messages, scrollback, live, streaming, send, clear, cancel, reset };
 }
 
 function maxIdOf(rows: ChatRow[]): number {
