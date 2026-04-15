@@ -1,6 +1,6 @@
-import { listActive, listAlwaysAllowed } from '../tools/index.js';
-import type { InfoPanel } from './chat-view.js';
-import { isKnownCommand, SLASH_COMMANDS } from './commands.js';
+import { isKnownCommand, SLASH_COMMANDS } from '../commands/index.js';
+import type { InfoPanel } from '../features/chat/chat-view.js';
+import { listActive, listAlwaysAllowed } from '../features/tools/index.js';
 
 export type Phase =
   | { kind: 'bootstrap'; status: string; error?: string | null }

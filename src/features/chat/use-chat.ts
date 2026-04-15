@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { streamChat } from '../ai.js';
-import type { CatalogProvider, ModelRef } from '../catalog.js';
-import { errorMessage, isAbortError } from '../errors.js';
+import { errorMessage, isAbortError } from '../../shared/errors/index.js';
+import type { CatalogProvider, ModelRef } from '../models/catalog.js';
 import type { Approver } from '../tools/index.js';
+import { streamChat } from './stream.js';
 
 export type UserRow = { id: number; kind: 'user'; content: string };
 export type AssistantRow = {

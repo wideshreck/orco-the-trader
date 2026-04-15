@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import type { ApprovalDecision, ApprovalRequest, Approver } from '../tools/index.js';
+import type { ApprovalDecision, ApprovalRequest, Approver } from './index.js';
 
 type Pending = ApprovalRequest & { resolve: (d: ApprovalDecision) => void };
 

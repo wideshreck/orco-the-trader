@@ -1,5 +1,5 @@
 import { Box, Text } from 'ink';
-import type { ApprovalRequest } from '../tools/index.js';
+import type { ApprovalRequest } from './index.js';
 
 export function ApprovalPrompt(props: { request: ApprovalRequest }) {
   const { request } = props;

@@ -1,11 +1,11 @@
 import { stepCountIs, streamText } from 'ai';
-import type { ChatRow } from './app/use-chat.js';
-import { getApiKey } from './auth.js';
-import type { CatalogProvider, ModelRef } from './catalog.js';
-import { resolveModel } from './providers.js';
-import { chatRowsToModelMessages } from './sessions/index.js';
-import type { Approver, StreamEvent } from './tools/index.js';
-import { bootstrapTools, buildAiSdkTools } from './tools/index.js';
+import { getApiKey } from '../models/auth.js';
+import type { CatalogProvider, ModelRef } from '../models/catalog.js';
+import { resolveModel } from '../models/providers.js';
+import { chatRowsToModelMessages } from '../sessions/index.js';
+import type { Approver, StreamEvent } from '../tools/index.js';
+import { bootstrapTools, buildAiSdkTools } from '../tools/index.js';
+import type { ChatRow } from './use-chat.js';
 
 export type StreamOptions = {
   signal?: AbortSignal;

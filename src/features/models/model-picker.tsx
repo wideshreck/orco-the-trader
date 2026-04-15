@@ -1,9 +1,9 @@
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { useEffect, useMemo, useState } from 'react';
-import { isAuthenticated } from '../auth.js';
-import type { Catalog, CatalogModel, CatalogProvider, ModelRef } from '../catalog.js';
-import { isSupportedProvider } from '../providers.js';
+import { isAuthenticated } from './auth.js';
+import type { Catalog, CatalogModel, CatalogProvider, ModelRef } from './catalog.js';
+import { isSupportedProvider } from './providers.js';
 
 type Row = {
   provider: CatalogProvider;

@@ -1,8 +1,8 @@
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { useState } from 'react';
-import { setAuth } from '../auth.js';
-import type { CatalogProvider } from '../catalog.js';
+import { setAuth } from './auth.js';
+import type { CatalogProvider } from './catalog.js';
 
 export function AuthPrompt(props: {
   provider: CatalogProvider;

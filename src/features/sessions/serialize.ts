@@ -1,5 +1,5 @@
 import type { ModelMessage } from 'ai';
-import type { ChatRow } from '../app/use-chat.js';
+import type { ChatRow } from '../chat/use-chat.js';
 import type { SessionEvent } from './types.js';
 
 export function chatRowToEvent(row: ChatRow, ts: number): SessionEvent {

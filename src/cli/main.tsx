@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import process from 'node:process';
 import { render } from 'ink';
-import { App } from './app.js';
+import { App } from '../app/app.js';
 
 const ENTER_ALT = '\x1b[?1049h\x1b[2J\x1b[H';
 const LEAVE_ALT = '\x1b[?1049l';

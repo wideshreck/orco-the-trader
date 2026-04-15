@@ -1,20 +1,20 @@
 import { useApp, useInput } from 'ink';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { type ChatFocus, ChatView, type InfoPanel } from './app/chat-view.js';
-import { matchCommands } from './app/commands.js';
-import { dispatchCommand, type Phase } from './app/dispatch.js';
-import { useApproval } from './app/use-approval.js';
-import { useChat } from './app/use-chat.js';
-import { useSession } from './app/use-session.js';
-import { isAuthenticated } from './auth.js';
-import { type Catalog, findModel, loadCatalog, type ModelRef } from './catalog.js';
-import { type Config, loadConfig, saveConfig } from './config.js';
-import { errorMessage } from './errors.js';
-import { setAlwaysAllowed } from './tools/index.js';
-import { AuthPrompt } from './ui/auth-prompt.js';
-import { Bootstrap } from './ui/bootstrap.js';
-import { ModelPicker } from './ui/model-picker.js';
-import { SessionPicker } from './ui/session-picker.js';
+import { matchCommands } from '../commands/index.js';
+import { type ChatFocus, ChatView, type InfoPanel } from '../features/chat/chat-view.js';
+import { useChat } from '../features/chat/use-chat.js';
+import { isAuthenticated } from '../features/models/auth.js';
+import { AuthPrompt } from '../features/models/auth-prompt.js';
+import { type Catalog, findModel, loadCatalog, type ModelRef } from '../features/models/catalog.js';
+import { ModelPicker } from '../features/models/model-picker.js';
+import { SessionPicker } from '../features/sessions/session-picker.js';
+import { useSession } from '../features/sessions/use-session.js';
+import { setAlwaysAllowed } from '../features/tools/index.js';
+import { useApproval } from '../features/tools/use-approval.js';
+import { type Config, loadConfig, saveConfig } from '../shared/config/user-config.js';
+import { errorMessage } from '../shared/errors/index.js';
+import { Bootstrap } from '../shared/ui/bootstrap.js';
+import { dispatchCommand, type Phase } from './dispatch.js';
 
 export function App() {
   const { exit } = useApp();

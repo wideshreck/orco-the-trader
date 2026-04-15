@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ChatRow } from '../chat/use-chat.js';
 import {
   appendToSession,
   chatRowToEvent,
@@ -12,8 +13,7 @@ import {
   type SessionId,
   type SessionMeta,
   titleFromUserMessage,
-} from '../sessions/index.js';
-import type { ChatRow } from './use-chat.js';
+} from './index.js';
 
 export type SessionChannel = {
   currentId: SessionId | null;

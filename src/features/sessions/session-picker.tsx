@@ -1,7 +1,7 @@
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { SessionId, SessionMeta } from '../sessions/index.js';
+import type { SessionId, SessionMeta } from './index.js';
 
 const VISIBLE = 12;
 

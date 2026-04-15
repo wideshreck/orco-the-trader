@@ -1,9 +1,9 @@
 import { Box, Text } from 'ink';
 import TextInput from 'ink-text-input';
+import type { SlashCommand } from '../../commands/index.js';
+import { Banner } from '../../shared/ui/banner.js';
+import { ApprovalPrompt } from '../tools/approval-prompt.js';
 import type { ApprovalRequest } from '../tools/index.js';
-import { ApprovalPrompt } from './approval-prompt.js';
-import { Banner } from './banner.js';
-import type { SlashCommand } from './commands.js';
 import { ToolCallView } from './tool-call-view.js';
 import type { ChatRow } from './use-chat.js';
 

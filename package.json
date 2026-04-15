@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "orco": "./dist/cli.js"
+    "orco": "./dist/cli/main.js"
   },
   "scripts": {
     "build": "tsc",
-    "dev": "bun src/cli.tsx",
-    "start": "bun dist/cli.js",
-    "compile": "bun build --compile --minify --target=bun-linux-x64 src/cli.tsx --outfile dist/orco",
+    "dev": "bun src/cli/main.tsx",
+    "start": "bun dist/cli/main.js",
+    "compile": "bun build --compile --minify --target=bun-linux-x64 src/cli/main.tsx --outfile dist/orco",
     "typecheck": "tsc --noEmit",
     "lint": "biome lint .",
     "format": "biome format --write .",

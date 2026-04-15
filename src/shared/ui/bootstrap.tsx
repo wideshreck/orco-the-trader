@@ -1,5 +1,5 @@
 import { Box, Text } from 'ink';
-import { Banner } from '../app/banner.js';
+import { Banner } from './banner.js';
 
 export function Bootstrap(props: { status: string; error?: string | null }) {
   return (
