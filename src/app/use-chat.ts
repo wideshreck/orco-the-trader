@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { type ChatMessage, streamChat } from '../ai.js';
+import { streamChat } from '../ai.js';
 import type { CatalogProvider, ModelRef } from '../catalog.js';
 import { errorMessage, isAbortError } from '../errors.js';
 import type { Approver } from '../tools/index.js';
@@ -27,17 +27,35 @@ export type SubmitOutcome = 'sent' | 'empty' | 'busy' | 'no-model';
 
 type Target = { provider: CatalogProvider; ref: ModelRef };
 
-export function useChat(target: Target | null, approver: Approver) {
-  const [messages, setMessages] = useState<ChatRow[]>([]);
+export type UseChatOptions = {
+  seedRows?: ChatRow[];
+  onCommit?: (row: ChatRow) => void;
+};
+
+export function useChat(target: Target | null, approver: Approver, opts: UseChatOptions = {}) {
+  const { onCommit } = opts;
+  const [messages, setMessages] = useState<ChatRow[]>(opts.seedRows ?? []);
   const [streaming, setStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
-  const idRef = useRef(0);
+  const idRef = useRef(maxIdOf(opts.seedRows ?? []));
+  const committedIdsRef = useRef<Set<number>>(new Set((opts.seedRows ?? []).map((r) => r.id)));
   const nextId = useCallback(() => ++idRef.current, []);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
   const cancel = useCallback(() => abortRef.current?.abort(), []);
-  const clear = useCallback(() => setMessages([]), []);
+
+  const reset = useCallback((newRows: ChatRow[]) => {
+    setMessages(newRows);
+    committedIdsRef.current = new Set(newRows.map((r) => r.id));
+    const max = maxIdOf(newRows);
+    if (max > idRef.current) idRef.current = max;
+  }, []);
+
+  const clear = useCallback(() => {
+    setMessages([]);
+    committedIdsRef.current = new Set();
+  }, []);
 
   const send = useCallback(
     async (text: string): Promise<SubmitOutcome> => {
@@ -56,6 +74,8 @@ export function useChat(target: Target | null, approver: Approver) {
       const baseHistory = [...messages, userMsg];
       setMessages([...baseHistory, initialAssistant]);
       setStreaming(true);
+      committedIdsRef.current.add(userMsg.id);
+      onCommit?.(userMsg);
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -63,12 +83,8 @@ export function useChat(target: Target | null, approver: Approver) {
       let assistantAcc = '';
       let activeAssistantId = assistantId;
 
-      const wire: ChatMessage[] = baseHistory
-        .filter((m): m is UserRow | AssistantRow => m.kind === 'user' || m.kind === 'assistant')
-        .map((m) => ({ role: m.kind, content: m.content }));
-
       try {
-        for await (const ev of streamChat(target.provider, target.ref, wire, {
+        for await (const ev of streamChat(target.provider, target.ref, baseHistory, {
           signal: controller.signal,
           approver,
         })) {
@@ -138,12 +154,12 @@ export function useChat(target: Target | null, approver: Approver) {
         }
       } catch (err: unknown) {
         const aborted = isAbortError(err);
-        const text = aborted ? '(canceled)' : `Error: ${errorMessage(err)}`;
+        const errText = aborted ? '(canceled)' : `Error: ${errorMessage(err)}`;
         const targetId = activeAssistantId;
         setMessages((prev) =>
           prev.map((r) => {
             if (r.id !== targetId || r.kind !== 'assistant') return r;
-            const next: AssistantRow = { ...r, content: text };
+            const next: AssistantRow = { ...r, content: errText };
             if (!aborted) next.error = true;
             return next;
           }),
@@ -151,14 +167,28 @@ export function useChat(target: Target | null, approver: Approver) {
       } finally {
         setStreaming(false);
         abortRef.current = null;
-        setMessages((prev) => trimEmptyTrailingAssistant(prev));
+        setMessages((prev) => {
+          const trimmed = trimEmptyTrailingAssistant(prev);
+          for (const row of trimmed) {
+            if (committedIdsRef.current.has(row.id)) continue;
+            committedIdsRef.current.add(row.id);
+            onCommit?.(row);
+          }
+          return trimmed;
+        });
       }
       return 'sent';
     },
-    [messages, streaming, target, approver, nextId],
+    [messages, streaming, target, approver, nextId, onCommit],
   );
 
-  return { messages, streaming, send, clear, cancel };
+  return { messages, streaming, send, clear, cancel, reset };
+}
+
+function maxIdOf(rows: ChatRow[]): number {
+  let m = 0;
+  for (const r of rows) if (r.id > m) m = r.id;
+  return m;
 }
 
 function trimEmptyTrailingAssistant(rows: ChatRow[]): ChatRow[] {
