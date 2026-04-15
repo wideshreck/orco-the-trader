@@ -2,6 +2,7 @@ import { Box, Static, Text } from 'ink';
 import type { SlashCommand } from '../../commands/index.js';
 import { renderMarkdown } from '../../shared/ui/markdown.js';
 import { MultiLineInput } from '../../shared/ui/multi-line-input.js';
+import { type Todo, TodosView } from '../todos/index.js';
 import { ApprovalPrompt } from '../tools/approval-prompt.js';
 import type { ApprovalRequest, QuestionRequest, TokenUsage } from '../tools/index.js';
 import { QuestionPrompt } from '../tools/question-prompt.js';
@@ -36,6 +37,7 @@ export function ChatView(props: {
   questionDraft: string;
   onQuestionDraftChange: (v: string) => void;
   onQuestionSubmit: (answer: string) => void;
+  todos: Todo[];
 }) {
   const {
     modelLabel,
@@ -51,7 +53,7 @@ export function ChatView(props: {
     approval,
     infoPanel,
   } = props;
-  const { queue, question, questionDraft, onQuestionDraftChange, onQuestionSubmit } = props;
+  const { queue, question, questionDraft, onQuestionDraftChange, onQuestionSubmit, todos } = props;
   const showSuggestions = focus === 'input' && !streaming && !approval && suggestions.length > 0;
   // Input stays typeable while streaming / awaiting approval: submissions
   // are queued by the parent and drained when the slot clears. Disabled while
@@ -93,6 +95,7 @@ export function ChatView(props: {
           })}
         </Box>
 
+        <TodosView todos={todos} />
         {approval && <ApprovalPrompt request={approval} />}
         {question && (
           <QuestionPrompt

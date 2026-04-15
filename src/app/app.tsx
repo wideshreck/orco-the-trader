@@ -11,6 +11,7 @@ import { type Catalog, findModel, loadCatalog, type ModelRef } from '../features
 import { ModelPicker } from '../features/models/model-picker.js';
 import { SessionPicker } from '../features/sessions/session-picker.js';
 import { useSession } from '../features/sessions/use-session.js';
+import { setTodoSink, type Todo } from '../features/todos/index.js';
 import {
   setAlwaysAllowed,
   setPermissionOverrides,
@@ -40,6 +41,7 @@ export function App() {
   // Messages typed while the assistant is streaming get queued and drained
   // FIFO when the stream settles.
   const [queue, setQueue] = useState<string[]>([]);
+  const [todos, setTodos] = useState<Todo[]>([]);
   // Up/down arrow cycles through previously-sent user messages when the input
   // is focused and the suggestion dropdown is not open.
   const historyIdxRef = useRef<number | null>(null);
@@ -75,6 +77,12 @@ export function App() {
     return () => setQuestionAsker(null);
   }, [question.asker]);
 
+  // Same pattern for the `todo_write` tool — it publishes list snapshots here.
+  useEffect(() => {
+    setTodoSink(setTodos);
+    return () => setTodoSink(null);
+  }, []);
+
   // Reset the answer draft whenever a new question arrives.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset on question transitions
   useEffect(() => {
@@ -99,6 +107,11 @@ export function App() {
       approval.resolve('deny');
     }
   }, [chat.streaming, approval]);
+
+  // Clear todos when the user starts a fresh session/new chat.
+  useEffect(() => {
+    if (chat.messages.length === 0) setTodos([]);
+  }, [chat.messages.length]);
 
   // Drain one queued submission each time the stream settles. Running it via
   // handleSubmitRef.current keeps slash-command dispatch consistent for queued
@@ -468,6 +481,7 @@ export function App() {
       questionDraft={questionDraft}
       onQuestionDraftChange={setQuestionDraft}
       onQuestionSubmit={(ans) => question.resolve(ans)}
+      todos={todos}
     />
   );
 }
