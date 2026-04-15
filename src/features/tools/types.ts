@@ -37,3 +37,10 @@ export type StreamEvent =
   | { type: 'usage'; usage: TokenUsage };
 
 export type Approver = (req: ApprovalRequest) => Promise<ApprovalDecision>;
+
+export type QuestionRequest = {
+  question: string;
+  choices?: string[];
+};
+
+export type Asker = (req: QuestionRequest) => Promise<string>;

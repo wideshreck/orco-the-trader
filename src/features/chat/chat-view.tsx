@@ -3,7 +3,8 @@ import type { SlashCommand } from '../../commands/index.js';
 import { renderMarkdown } from '../../shared/ui/markdown.js';
 import { MultiLineInput } from '../../shared/ui/multi-line-input.js';
 import { ApprovalPrompt } from '../tools/approval-prompt.js';
-import type { ApprovalRequest, TokenUsage } from '../tools/index.js';
+import type { ApprovalRequest, QuestionRequest, TokenUsage } from '../tools/index.js';
+import { QuestionPrompt } from '../tools/question-prompt.js';
 import { formatTokens } from './cost.js';
 import { ToolCallView } from './tool-call-view.js';
 import type { ChatRow } from './use-chat.js';
@@ -31,6 +32,10 @@ export function ChatView(props: {
   contextLimit: number | null;
   compactionActive: boolean;
   queue: string[];
+  question: QuestionRequest | null;
+  questionDraft: string;
+  onQuestionDraftChange: (v: string) => void;
+  onQuestionSubmit: (answer: string) => void;
 }) {
   const {
     modelLabel,
@@ -46,11 +51,13 @@ export function ChatView(props: {
     approval,
     infoPanel,
   } = props;
+  const { queue, question, questionDraft, onQuestionDraftChange, onQuestionSubmit } = props;
   const showSuggestions = focus === 'input' && !streaming && !approval && suggestions.length > 0;
   // Input stays typeable while streaming / awaiting approval: submissions
-  // are queued by the parent and drained when the slot clears.
-  const inputActive = focus === 'input' && !approval;
-  const { queue } = props;
+  // are queued by the parent and drained when the slot clears. Disabled while
+  // the agent is asking a question so keystrokes go to the question prompt.
+  const inputActive = focus === 'input' && !approval && !question;
+  const questionInputActive = question !== null && !question.choices;
   const totalTokens = sumTokens([...scrollback, ...live]);
   const lastInputTokens = lastTurnInput([...scrollback, ...live]);
   const { contextLimit, compactionActive } = props;
@@ -87,6 +94,15 @@ export function ChatView(props: {
         </Box>
 
         {approval && <ApprovalPrompt request={approval} />}
+        {question && (
+          <QuestionPrompt
+            request={question}
+            draft={questionDraft}
+            onDraftChange={onQuestionDraftChange}
+            onSubmit={onQuestionSubmit}
+            isActive={questionInputActive}
+          />
+        )}
         {infoPanel && (
           <Box
             flexDirection="column"

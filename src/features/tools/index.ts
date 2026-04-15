@@ -1,3 +1,4 @@
+import { askUser } from './builtin/ask-user.js';
 import { echo } from './builtin/echo.js';
 import { getTime } from './builtin/get-time.js';
 import { buildSkillTool } from './builtin/skill.js';
@@ -10,6 +11,7 @@ export function bootstrapTools(): void {
   bootstrapped = true;
   register(getTime);
   register(echo);
+  register(askUser);
   const skillTool = buildSkillTool();
   if (skillTool) register(skillTool);
 }
@@ -21,6 +23,7 @@ export {
   setAlwaysAllowed,
 } from './approvals.js';
 export { defineTool } from './define.js';
+export { askHumanUser, setQuestionAsker } from './question.js';
 export {
   buildAiSdkTools,
   effectivePermission,
@@ -33,8 +36,10 @@ export type {
   ApprovalDecision,
   ApprovalRequest,
   Approver,
+  Asker,
   OrcoTool,
   Permission,
+  QuestionRequest,
   StreamEvent,
   TokenUsage,
   ToolContext,

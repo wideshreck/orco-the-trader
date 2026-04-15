@@ -11,8 +11,13 @@ import { type Catalog, findModel, loadCatalog, type ModelRef } from '../features
 import { ModelPicker } from '../features/models/model-picker.js';
 import { SessionPicker } from '../features/sessions/session-picker.js';
 import { useSession } from '../features/sessions/use-session.js';
-import { setAlwaysAllowed, setPermissionOverrides } from '../features/tools/index.js';
+import {
+  setAlwaysAllowed,
+  setPermissionOverrides,
+  setQuestionAsker,
+} from '../features/tools/index.js';
 import { useApproval } from '../features/tools/use-approval.js';
+import { useQuestion } from '../features/tools/use-question.js';
 import { type Config, loadConfig, saveConfig } from '../shared/config/user-config.js';
 import { errorMessage } from '../shared/errors/index.js';
 import { Bootstrap } from '../shared/ui/bootstrap.js';
@@ -59,7 +64,22 @@ export function App() {
       : null;
 
   const approval = useApproval();
+  const question = useQuestion();
+  const [questionDraft, setQuestionDraft] = useState('');
   const session = useSession();
+
+  // Wire the module-level asker so the `ask_user` builtin tool routes questions
+  // through the current UI.
+  useEffect(() => {
+    setQuestionAsker(question.asker);
+    return () => setQuestionAsker(null);
+  }, [question.asker]);
+
+  // Reset the answer draft whenever a new question arrives.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset on question transitions
+  useEffect(() => {
+    setQuestionDraft('');
+  }, [question.pending]);
   const chat = useChat(target, approval.approver, {
     seedRows: session.initial.rows,
     seedCompactionPoint: session.initial.compactionPoint,
@@ -188,6 +208,25 @@ export function App() {
         approval.resolve('always');
         return;
       }
+      return;
+    }
+    if (question.pending) {
+      const choices = question.pending.choices;
+      if (key.escape) {
+        question.resolve('');
+        return;
+      }
+      if (choices && ch && /^[1-9]$/.test(ch)) {
+        const idx = Number(ch) - 1;
+        if (idx < choices.length) {
+          const picked = choices[idx];
+          if (picked !== undefined) question.resolve(picked);
+        }
+        return;
+      }
+      // Free-form answer handling lives in the QuestionPrompt input itself; the
+      // input's own useInput consumes chars. We just swallow ctrl+c fallthrough
+      // so approval/exit logic above still works.
       return;
     }
     if (infoPanel) {
@@ -425,6 +464,10 @@ export function App() {
       contextLimit={contextLimit}
       compactionActive={chat.compactionPoint !== null}
       queue={queue}
+      question={question.pending}
+      questionDraft={questionDraft}
+      onQuestionDraftChange={setQuestionDraft}
+      onQuestionSubmit={(ans) => question.resolve(ans)}
     />
   );
 }
