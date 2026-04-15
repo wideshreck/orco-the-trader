@@ -1,39 +1,11 @@
-import React from 'react';
 import { Box, Text } from 'ink';
+import React from 'react';
+import { Banner } from '../app/banner.js';
 
 export function Bootstrap(props: { status: string; error?: string | null }) {
   return (
     <Box flexDirection="column" padding={1}>
-      <Box
-        flexDirection="column"
-        alignItems="center"
-        borderStyle="round"
-        borderColor="cyan"
-        paddingX={2}
-        paddingY={1}
-      >
-        <Text color="cyan" bold>
-          {'     ██╗ █████╗ ██████╗ ██╗   ██╗██╗███████╗'}
-        </Text>
-        <Text color="cyan" bold>
-          {'     ██║██╔══██╗██╔══██╗██║   ██║██║██╔════╝'}
-        </Text>
-        <Text color="cyan" bold>
-          {'     ██║███████║██████╔╝██║   ██║██║███████╗'}
-        </Text>
-        <Text color="cyan" bold>
-          {'██   ██║██╔══██║██╔══██╗╚██╗ ██╔╝██║╚════██║'}
-        </Text>
-        <Text color="cyan" bold>
-          {'╚█████╔╝██║  ██║██║  ██║ ╚████╔╝ ██║███████║'}
-        </Text>
-        <Text color="cyan" bold>
-          {' ╚════╝ ╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚═╝╚══════╝'}
-        </Text>
-        <Box marginTop={1}>
-          <Text dimColor>The Trader v0.1</Text>
-        </Box>
-      </Box>
+      <Banner subtitle={<Text dimColor>The Trader v0.1</Text>} />
       <Box marginTop={1}>
         {props.error ? (
           <Text color="red">✗ {props.error}</Text>

@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import type { Catalog, CatalogModel, CatalogProvider, ModelRef } from '../catalog.js';
+import React, { useMemo, useState } from 'react';
 import { isAuthenticated } from '../auth.js';
+import type { Catalog, CatalogModel, CatalogProvider, ModelRef } from '../catalog.js';
 import { isSupportedProvider } from '../providers.js';
 
 type Row = {
@@ -117,7 +117,7 @@ export function ModelPicker(props: {
       </Box>
 
       <Box flexDirection="column" marginTop={1}>
-        {windowRows.length === 0 && <Text dimColor>(eşleşen model yok)</Text>}
+        {windowRows.length === 0 && <Text dimColor>(no matching models)</Text>}
         {windowRows.map((r, i) => {
           const globalIdx = windowStart + i;
           const selected = globalIdx === safeCursor;
@@ -134,10 +134,15 @@ export function ModelPicker(props: {
           ]
             .filter(Boolean)
             .join(' ');
+          const rowColor: 'cyan' | 'gray' | undefined = selected
+            ? 'cyan'
+            : r.authed
+              ? undefined
+              : 'gray';
           return (
             <Box key={`${r.provider.id}/${r.model.id}`}>
               <Text
-                color={selected ? 'cyan' : r.authed ? undefined : 'gray'}
+                {...(rowColor !== undefined ? { color: rowColor } : {})}
                 inverse={selected}
                 bold={selected}
               >
@@ -162,7 +167,7 @@ export function ModelPicker(props: {
       </Box>
 
       <Box marginTop={1}>
-        <Text dimColor>↑↓ gez · pgup/pgdn · enter seç · esc iptal · yaz ile filtrele</Text>
+        <Text dimColor>↑↓ navigate · pgup/pgdn · enter select · esc cancel · type to filter</Text>
       </Box>
     </Box>
   );
