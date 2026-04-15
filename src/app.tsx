@@ -1,7 +1,7 @@
 import { useApp, useInput } from 'ink';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { type ChatFocus, ChatView, type InfoPanel } from './app/chat-view.js';
-import { matchCommands, SLASH_COMMANDS } from './app/commands.js';
+import { isKnownCommand, matchCommands, SLASH_COMMANDS } from './app/commands.js';
 import { useApproval } from './app/use-approval.js';
 import { useChat } from './app/use-chat.js';
 import { isAuthenticated } from './auth.js';
@@ -31,10 +31,12 @@ export function App() {
   const [focus, setFocus] = useState<ChatFocus>('input');
   const [exitWarning, setExitWarning] = useState(false);
   const [suggestionIdx, setSuggestionIdx] = useState(0);
+  const [suggestionsDismissedFor, setSuggestionsDismissedFor] = useState<string | null>(null);
   const [infoPanel, setInfoPanel] = useState<InfoPanel | null>(null);
   const warningTimer = useRef<NodeJS.Timeout | null>(null);
 
-  const suggestions = useMemo(() => matchCommands(input), [input]);
+  const rawSuggestions = useMemo(() => matchCommands(input), [input]);
+  const suggestions = suggestionsDismissedFor === input ? [] : rawSuggestions;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: input is the trigger
   useEffect(() => {
@@ -121,17 +123,17 @@ export function App() {
       return;
     }
     if (infoPanel) {
-      setInfoPanel(null);
+      if (key.escape || key.return || ch === ' ') setInfoPanel(null);
       return;
     }
     if (phase.kind !== 'chat') return;
     if (focus === 'input' && suggestions.length > 0) {
       if (key.upArrow) {
-        setSuggestionIdx((i) => Math.max(0, i - 1));
+        setSuggestionIdx((i) => (i - 1 + suggestions.length) % suggestions.length);
         return;
       }
       if (key.downArrow) {
-        setSuggestionIdx((i) => Math.min(suggestions.length - 1, i + 1));
+        setSuggestionIdx((i) => (i + 1) % suggestions.length);
         return;
       }
       if (key.tab) {
@@ -140,7 +142,7 @@ export function App() {
         return;
       }
       if (key.escape) {
-        setInput('');
+        setSuggestionsDismissedFor(input);
         return;
       }
     }
@@ -199,6 +201,14 @@ export function App() {
     }
     if (trimmed === '/exit') {
       exit();
+      return;
+    }
+    if (trimmed.startsWith('/') && !isKnownCommand(trimmed)) {
+      setInput('');
+      setInfoPanel({
+        title: 'unknown command',
+        lines: [`  ${trimmed} is not a recognized command`, '  type /help to see all commands'],
+      });
       return;
     }
     setInput('');

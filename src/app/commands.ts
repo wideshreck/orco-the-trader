@@ -4,12 +4,16 @@ export type SlashCommand = {
 };
 
 export const SLASH_COMMANDS: readonly SlashCommand[] = [
-  { name: '/model', description: 'select model' },
   { name: '/clear', description: 'clear chat history' },
-  { name: '/tools', description: 'list registered tools' },
-  { name: '/help', description: 'show all commands' },
   { name: '/exit', description: 'exit orco' },
+  { name: '/help', description: 'show all commands' },
+  { name: '/model', description: 'select model' },
+  { name: '/tools', description: 'list registered tools' },
 ] as const;
+
+export function isKnownCommand(name: string): boolean {
+  return SLASH_COMMANDS.some((c) => c.name === name);
+}
 
 export function matchCommands(input: string): SlashCommand[] {
   if (!input.startsWith('/')) return [];
