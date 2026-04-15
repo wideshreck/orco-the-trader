@@ -1,0 +1,32 @@
+{
+  "name": "jarvis-the-trader",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "jarvis": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.tsx",
+    "start": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.69",
+    "@ai-sdk/google": "^3.0.63",
+    "@ai-sdk/groq": "^3.0.35",
+    "@ai-sdk/openai": "^3.0.53",
+    "@ai-sdk/xai": "^3.0.82",
+    "@openrouter/ai-sdk-provider": "^2.6.0",
+    "ai": "^6.0.161",
+    "ink": "^5.0.1",
+    "ink-text-input": "^6.0.0",
+    "ollama-ai-provider-v2": "^3.5.0",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/react": "^18.3.12",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}
