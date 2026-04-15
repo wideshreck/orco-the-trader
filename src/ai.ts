@@ -1,14 +1,11 @@
-import { type ModelMessage, stepCountIs, streamText } from 'ai';
+import { stepCountIs, streamText } from 'ai';
+import type { ChatRow } from './app/use-chat.js';
 import { getApiKey } from './auth.js';
 import type { CatalogProvider, ModelRef } from './catalog.js';
 import { resolveModel } from './providers.js';
+import { chatRowsToModelMessages } from './sessions/index.js';
 import type { Approver, StreamEvent } from './tools/index.js';
 import { bootstrapTools, buildAiSdkTools } from './tools/index.js';
-
-export type ChatMessage = {
-  role: 'user' | 'assistant';
-  content: string;
-};
 
 export type StreamOptions = {
   signal?: AbortSignal;
@@ -20,7 +17,7 @@ bootstrapTools();
 export async function* streamChat(
   provider: CatalogProvider,
   ref: ModelRef,
-  messages: ChatMessage[],
+  rows: ChatRow[],
   opts: StreamOptions,
 ): AsyncGenerator<StreamEvent, void, void> {
   const apiKey = getApiKey(provider.id, provider.env);
@@ -30,11 +27,7 @@ export async function* streamChat(
     ...(apiKey !== undefined ? { apiKey } : {}),
   });
 
-  const modelMessages: ModelMessage[] = messages.map((m) => ({
-    role: m.role,
-    content: m.content,
-  }));
-
+  const modelMessages = chatRowsToModelMessages(rows);
   const tools = buildAiSdkTools({ approver: opts.approver, signal: opts.signal });
 
   const result = streamText({
@@ -74,7 +67,6 @@ export async function* streamChat(
           error: errorString(part.error),
         };
         break;
-      // text-start, text-end, reasoning, finish, start-step, finish-step, etc — ignored
     }
   }
 }
