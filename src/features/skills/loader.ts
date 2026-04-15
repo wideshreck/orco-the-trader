@@ -7,12 +7,12 @@ const SKILLS_DIR = path.join(os.homedir(), '.config', 'orco', 'skills');
 
 const FRONTMATTER_RE = /^---\s*\n([\s\S]+?)\n---\s*\n?([\s\S]*)$/;
 
-type ParsedFrontmatter = {
+export type ParsedFrontmatter = {
   fields: Record<string, string>;
   body: string;
 };
 
-function parseFrontmatter(raw: string): ParsedFrontmatter | null {
+export function parseFrontmatter(raw: string): ParsedFrontmatter | null {
   const m = raw.match(FRONTMATTER_RE);
   if (!m) return null;
   const [, block = '', body = ''] = m;
