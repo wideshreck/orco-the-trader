@@ -4,6 +4,7 @@ import { getFundingRate } from './tools/get-funding-rate.js';
 import { getMarketContext } from './tools/get-market-context.js';
 import { getOhlcv } from './tools/get-ohlcv.js';
 import { getOrderBook } from './tools/get-order-book.js';
+import { getLongShortRatio, getOpenInterest } from './tools/get-positioning.js';
 import { getTicker24h } from './tools/get-ticker-24h.js';
 import { listTopSymbols } from './tools/list-top-symbols.js';
 import { multiTimeframeAnalysis } from './tools/multi-tf.js';
@@ -23,6 +24,8 @@ export function bootstrapTrading(): void {
   register(scanMarket);
   register(multiTimeframeAnalysis);
   register(getMarketContext);
+  register(getOpenInterest);
+  register(getLongShortRatio);
 }
 
 export type { Candle } from './tools/get-ohlcv.js';
