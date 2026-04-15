@@ -18,6 +18,7 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
   { name: '/sessions', description: 'browse and switch sessions' },
   { name: '/skills', description: 'list installed skills' },
   { name: '/tools', description: 'list registered tools' },
+  { name: '/watchlist', description: 'show saved watchlist symbols' },
 ] as const;
 
 export function matchCommands(input: string): SlashCommand[] {

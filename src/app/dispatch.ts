@@ -8,6 +8,7 @@ import { listMcpServers } from '../features/mcp/index.js';
 import type { Catalog, ModelRef } from '../features/models/catalog.js';
 import { listSkills, skillsDir } from '../features/skills/index.js';
 import { effectivePermission, listActive, listAlwaysAllowed } from '../features/tools/index.js';
+import { loadWatchlist } from '../features/watchlist/index.js';
 import { isLoggingEnabled, logFilePath } from '../shared/logging/logger.js';
 
 export type Phase =
@@ -58,6 +59,15 @@ export function dispatchCommand(trimmed: string, ctx: DispatchCtx): DispatchResu
       return `  ${t.name.padEnd(18)} [${tier}]  ${clipped}`;
     });
     ctx.setInfoPanel({ title: 'tools', lines: lines.length ? lines : ['  (none registered)'] });
+    return 'handled';
+  }
+  if (trimmed === '/watchlist') {
+    const wl = loadWatchlist();
+    const lines =
+      wl.symbols.length === 0
+        ? ['  (empty — ask orco to add symbols)']
+        : wl.symbols.map((s) => `  ${s}`);
+    ctx.setInfoPanel({ title: 'watchlist', lines });
     return 'handled';
   }
   if (trimmed === '/cost') {
