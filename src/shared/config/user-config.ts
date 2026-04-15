@@ -10,11 +10,9 @@ function configPath(): string {
   return path.join(configDir(), 'config.json');
 }
 
-export type McpServerConfig = {
-  type: 'http';
-  url: string;
-  headers?: Record<string, string>;
-};
+export type McpServerConfig =
+  | { type: 'http'; url: string; headers?: Record<string, string> }
+  | { type: 'stdio'; command: string; args?: string[]; env?: Record<string, string> };
 
 export type ToolPermission = 'auto' | 'ask' | 'deny';
 
@@ -30,18 +28,34 @@ function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
+function parseStringRecord(raw: unknown): Record<string, string> | null {
+  if (!isObject(raw)) return null;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (typeof v === 'string') out[k] = v;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
 function parseMcpServer(raw: unknown): McpServerConfig | null {
   if (!isObject(raw)) return null;
-  if (raw.type !== 'http' || typeof raw.url !== 'string') return null;
-  const cfg: McpServerConfig = { type: 'http', url: raw.url };
-  if (isObject(raw.headers)) {
-    const headers: Record<string, string> = {};
-    for (const [k, v] of Object.entries(raw.headers)) {
-      if (typeof v === 'string') headers[k] = v;
-    }
-    if (Object.keys(headers).length > 0) cfg.headers = headers;
+  if (raw.type === 'http' && typeof raw.url === 'string') {
+    const cfg: McpServerConfig = { type: 'http', url: raw.url };
+    const headers = parseStringRecord(raw.headers);
+    if (headers) cfg.headers = headers;
+    return cfg;
   }
-  return cfg;
+  if (raw.type === 'stdio' && typeof raw.command === 'string') {
+    const cfg: McpServerConfig = { type: 'stdio', command: raw.command };
+    if (Array.isArray(raw.args)) {
+      const args = raw.args.filter((a): a is string => typeof a === 'string');
+      if (args.length > 0) cfg.args = args;
+    }
+    const env = parseStringRecord(raw.env);
+    if (env) cfg.env = env;
+    return cfg;
+  }
+  return null;
 }
 
 export function loadConfig(): Config {

@@ -4,7 +4,14 @@ export type HttpTransport = {
   headers?: Record<string, string>;
 };
 
-export type McpServerConfig = HttpTransport;
+export type StdioTransport = {
+  type: 'stdio';
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+};
+
+export type McpServerConfig = HttpTransport | StdioTransport;
 
 export type McpServerStatus =
   | { state: 'connecting' }

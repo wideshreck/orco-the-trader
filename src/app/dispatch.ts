@@ -119,10 +119,11 @@ export function dispatchCommand(trimmed: string, ctx: DispatchCtx): DispatchResu
       });
     } else {
       const lines = servers.map((s) => {
+        const target = s.config.type === 'http' ? s.config.url : `${s.config.command}`;
         if (s.status.state === 'ready')
-          return `  ✓ ${s.name.padEnd(16)} ready · ${s.status.toolCount} tools  ${s.config.url}`;
+          return `  ✓ ${s.name.padEnd(16)} ready · ${s.status.toolCount} tools  ${target}`;
         if (s.status.state === 'connecting')
-          return `  … ${s.name.padEnd(16)} connecting  ${s.config.url}`;
+          return `  … ${s.name.padEnd(16)} connecting  ${target}`;
         return `  ✗ ${s.name.padEnd(16)} failed: ${s.status.error}`;
       });
       ctx.setInfoPanel({ title: 'mcp servers', lines });

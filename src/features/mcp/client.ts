@@ -1,4 +1,5 @@
 import { createMCPClient } from '@ai-sdk/mcp';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { ToolSet } from 'ai';
 import { isAlwaysAllowed } from '../tools/approvals.js';
 import type { Approver } from '../tools/types.js';
@@ -16,13 +17,22 @@ export async function connectServer(
   name: string,
   config: McpServerConfig,
 ): Promise<ConnectedServer> {
-  const client = await createMCPClient({
-    transport: {
-      type: 'http',
-      url: config.url,
-      ...(config.headers ? { headers: config.headers } : {}),
-    },
-  });
+  const client =
+    config.type === 'stdio'
+      ? await createMCPClient({
+          transport: new StdioClientTransport({
+            command: config.command,
+            args: config.args ?? [],
+            env: { ...process.env, ...(config.env ?? {}) } as Record<string, string>,
+          }),
+        })
+      : await createMCPClient({
+          transport: {
+            type: 'http',
+            url: config.url,
+            ...(config.headers ? { headers: config.headers } : {}),
+          },
+        });
   const tools = await client.tools();
   return { name, client, tools };
 }

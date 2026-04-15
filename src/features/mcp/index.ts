@@ -22,7 +22,10 @@ export async function bootstrapMcp(
   await Promise.all(
     Object.entries(servers).map(async ([name, config]) => {
       registry.set(name, { name, config, status: { state: 'connecting' } });
-      logger.info('mcp', 'connecting', { name, url: config.url });
+      logger.info('mcp', 'connecting', {
+        name,
+        target: config.type === 'http' ? config.url : config.command,
+      });
       try {
         const conn = await connectServer(name, config);
         clients.set(name, conn);
