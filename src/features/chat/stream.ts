@@ -1,4 +1,4 @@
-import { stepCountIs, streamText } from 'ai';
+import { type ModelMessage, stepCountIs, streamText } from 'ai';
 import { logger } from '../../shared/logging/logger.js';
 import { getMcpTools } from '../mcp/index.js';
 import { getApiKey } from '../models/auth.js';
@@ -34,19 +34,37 @@ export async function* streamChat(
   const nativeTools = buildAiSdkTools({ approver: opts.approver, signal: opts.signal });
   const mcpTools = getMcpTools(opts.approver);
   const tools = { ...nativeTools, ...mcpTools };
+
+  // Prompt caching: Anthropic rewards a stable, large system block with
+  // significant token discounts on repeat turns. Injecting the system prompt
+  // as the first message with `providerOptions.anthropic.cacheControl` opts us
+  // in; other providers ignore the metadata transparently.
+  const messagesWithSystem: ModelMessage[] = opts.system
+    ? [
+        {
+          role: 'system',
+          content: opts.system,
+          providerOptions: {
+            anthropic: { cacheControl: { type: 'ephemeral' } },
+          },
+        } as ModelMessage,
+        ...modelMessages,
+      ]
+    : modelMessages;
+
   logger.debug('stream', 'starting', {
     provider: ref.providerId,
     model: ref.modelId,
-    messages: modelMessages.length,
+    messages: messagesWithSystem.length,
     tools: Object.keys(tools).length,
+    cache: opts.system ? 'anthropic-system' : 'off',
   });
 
   const result = streamText({
     model,
-    messages: modelMessages,
+    messages: messagesWithSystem,
     tools,
     stopWhen: stepCountIs(20),
-    ...(opts.system ? { system: opts.system } : {}),
     ...(opts.signal ? { abortSignal: opts.signal } : {}),
   });
 

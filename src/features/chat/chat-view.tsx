@@ -1,7 +1,7 @@
 import { Box, Static, Text } from 'ink';
-import TextInput from 'ink-text-input';
 import type { SlashCommand } from '../../commands/index.js';
 import { renderMarkdown } from '../../shared/ui/markdown.js';
+import { MultiLineInput } from '../../shared/ui/multi-line-input.js';
 import { ApprovalPrompt } from '../tools/approval-prompt.js';
 import type { ApprovalRequest, TokenUsage } from '../tools/index.js';
 import { formatTokens } from './cost.js';
@@ -138,14 +138,14 @@ export function ChatView(props: {
           <Text color="cyan" bold>
             {'$ '}
           </Text>
-          <Box flexGrow={1}>
+          <Box flexGrow={1} flexDirection="column">
             {inputActive ? (
-              <TextInput
+              <MultiLineInput
                 value={input}
                 onChange={props.onInputChange}
                 onSubmit={props.onSubmit}
-                placeholder="ask orco anything... (/help)"
-                showCursor
+                placeholder="ask orco anything... (/help · shift+enter or \\ for newline)"
+                isActive={inputActive}
               />
             ) : (
               <Text dimColor>

@@ -77,6 +77,35 @@ export function App() {
     }
   }, [chat.streaming, approval]);
 
+  // Auto-compact when the last turn's input tokens cross 90% of the model's
+  // context window. Fires once per turn after the stream settles.
+  const prevStreamingRef = useRef(false);
+  useEffect(() => {
+    const wasStreaming = prevStreamingRef.current;
+    prevStreamingRef.current = chat.streaming;
+    if (!wasStreaming || chat.streaming) return;
+    if (chat.compactionPoint) return; // already compacted in this session
+    if (!target) return;
+    const limit = catalog?.[target.ref.providerId]?.models[target.ref.modelId]?.limit?.context;
+    if (!limit) return;
+    let lastInput = 0;
+    for (let i = chat.messages.length - 1; i >= 0; i--) {
+      const r = chat.messages[i];
+      if (r?.kind === 'assistant' && r.usage) {
+        lastInput = r.usage.inputTokens;
+        break;
+      }
+    }
+    if (lastInput / limit < 0.9) return;
+    setInfoPanel({
+      title: 'auto-compact',
+      lines: [
+        `  context ${Math.round((lastInput / limit) * 100)}% full — summarizing older messages...`,
+      ],
+    });
+    void chat.compact();
+  }, [chat.streaming, chat.compactionPoint, chat.messages, chat.compact, target, catalog]);
+
   useEffect(() => {
     setPermissionOverrides(config.toolOverrides ?? {});
   }, [config.toolOverrides]);
