@@ -75,7 +75,7 @@ function parseProvider(raw: unknown): CatalogProvider | null {
   return { ...(raw as unknown as CatalogProvider), models };
 }
 
-function parseCatalog(raw: unknown): Catalog {
+export function parseCatalog(raw: unknown): Catalog {
   if (!isObject(raw)) throw new Error('catalog: root is not an object');
   const out: Catalog = {};
   for (const [k, v] of Object.entries(raw)) {
