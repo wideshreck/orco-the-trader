@@ -68,8 +68,7 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
   useEffect(() => {
     const settled = live.filter(
       (r) =>
-        r.kind === 'tool' &&
-        (r.status === 'done' || r.status === 'error' || r.status === 'denied'),
+        r.kind === 'tool' && (r.status === 'done' || r.status === 'error' || r.status === 'denied'),
     );
     if (settled.length === 0) return;
     const settledIds = new Set(settled.map((r) => r.id));
