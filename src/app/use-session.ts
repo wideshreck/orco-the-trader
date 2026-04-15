@@ -27,13 +27,21 @@ export type SessionChannel = {
 };
 
 export function useSession(): SessionChannel {
-  const [currentId, setCurrentId] = useState<SessionId | null>(null);
+  const [currentId, setCurrentIdState] = useState<SessionId | null>(null);
   const [initialRows, setInitialRows] = useState<ChatRow[]>([]);
   const [ready, setReady] = useState(false);
+  // Refs are the source of truth so synchronous successive recordRow calls in the
+  // same render cycle see consistent state (React state updates are async).
+  const currentIdRef = useRef<SessionId | null>(null);
   const titleRef = useRef<string | null>(null);
   const messageCountRef = useRef(0);
   const createdAtRef = useRef<number>(0);
   const modelLoggedRef = useRef(false);
+
+  const setCurrentId = useCallback((id: SessionId | null) => {
+    currentIdRef.current = id;
+    setCurrentIdState(id);
+  }, []);
 
   useEffect(() => {
     reconcileIndex();
@@ -50,14 +58,14 @@ export function useSession(): SessionChannel {
       modelLoggedRef.current = true;
     }
     setReady(true);
-  }, []);
+  }, [setCurrentId]);
 
   const ensureSession = useCallback(
     (
       firstUserContent: string | null,
       modelInfo?: { providerId: string; modelId: string },
     ): SessionId => {
-      if (currentId) return currentId;
+      if (currentIdRef.current) return currentIdRef.current;
       const id = createSession();
       const now = Date.now();
       createdAtRef.current = now;
@@ -77,7 +85,7 @@ export function useSession(): SessionChannel {
       setCurrentId(id);
       return id;
     },
-    [currentId],
+    [setCurrentId],
   );
 
   const recordRow = useCallback(
@@ -113,28 +121,31 @@ export function useSession(): SessionChannel {
     messageCountRef.current = 0;
     createdAtRef.current = 0;
     modelLoggedRef.current = false;
-  }, []);
+  }, [setCurrentId]);
 
-  const switchTo = useCallback((id: SessionId): ChatRow[] => {
-    const events = loadSession(id);
-    const rows = eventsToChatRows(events);
-    const meta = listSessions().find((s) => s.id === id);
-    setCurrentId(id);
-    setInitialRows(rows);
-    titleRef.current = meta?.title ?? '(untitled)';
-    messageCountRef.current = meta?.messageCount ?? rows.length;
-    createdAtRef.current = meta?.createdAt ?? Date.now();
-    modelLoggedRef.current = true;
-    return rows;
-  }, []);
+  const switchTo = useCallback(
+    (id: SessionId): ChatRow[] => {
+      const events = loadSession(id);
+      const rows = eventsToChatRows(events);
+      const meta = listSessions().find((s) => s.id === id);
+      setCurrentId(id);
+      setInitialRows(rows);
+      titleRef.current = meta?.title ?? '(untitled)';
+      messageCountRef.current = meta?.messageCount ?? rows.length;
+      createdAtRef.current = meta?.createdAt ?? Date.now();
+      modelLoggedRef.current = true;
+      return rows;
+    },
+    [setCurrentId],
+  );
 
   const list = useCallback(() => listSessions(), []);
   const remove = useCallback(
     (id: SessionId) => {
       removeSession(id);
-      if (id === currentId) startNew();
+      if (id === currentIdRef.current) startNew();
     },
-    [currentId, startNew],
+    [startNew],
   );
 
   return { currentId, initialRows, ready, recordRow, startNew, switchTo, list, remove };
