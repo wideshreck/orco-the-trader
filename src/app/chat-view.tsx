@@ -1,10 +1,15 @@
 import { Box, Text } from 'ink';
 import TextInput from 'ink-text-input';
+import type { ApprovalRequest } from '../tools/index.js';
+import { ApprovalPrompt } from './approval-prompt.js';
 import { Banner } from './banner.js';
 import type { SlashCommand } from './commands.js';
+import { ToolCallView } from './tool-call-view.js';
 import type { ChatRow } from './use-chat.js';
 
 export type ChatFocus = 'input' | 'tools-bar' | 'tools-panel';
+
+export type InfoPanel = { title: string; lines: string[] };
 
 export function ChatView(props: {
   modelLabel: string;
@@ -17,10 +22,23 @@ export function ChatView(props: {
   exitWarning: boolean;
   suggestions: SlashCommand[];
   suggestionIdx: number;
+  approval: ApprovalRequest | null;
+  infoPanel: InfoPanel | null;
 }) {
-  const { modelLabel, messages, streaming, input, focus, exitWarning, suggestions, suggestionIdx } =
-    props;
-  const showSuggestions = focus === 'input' && !streaming && suggestions.length > 0;
+  const {
+    modelLabel,
+    messages,
+    streaming,
+    input,
+    focus,
+    exitWarning,
+    suggestions,
+    suggestionIdx,
+    approval,
+    infoPanel,
+  } = props;
+  const showSuggestions = focus === 'input' && !streaming && !approval && suggestions.length > 0;
+  const inputActive = focus === 'input' && !streaming && !approval;
   return (
     <Box flexDirection="column" padding={1}>
       <Box flexDirection="column" marginBottom={1}>
@@ -38,21 +56,47 @@ export function ChatView(props: {
         {messages.length === 0 && (
           <Text dimColor>Type a message and press enter · /model select model · /clear reset</Text>
         )}
-        {messages.map((msg, i) => (
-          <Box key={msg.id} flexDirection="column" marginBottom={1}>
-            <Text color={msg.role === 'user' ? 'green' : 'magenta'} bold>
-              {msg.role === 'user' ? '› you' : '‹ orco'}
-            </Text>
-            {msg.error ? (
-              <Text color="red">{msg.content}</Text>
-            ) : (
-              <Text>{msg.content || (streaming && i === messages.length - 1 ? '…' : '')}</Text>
-            )}
-          </Box>
-        ))}
+        {messages.map((msg, i) => {
+          if (msg.kind === 'tool') return <ToolCallView key={msg.id} row={msg} />;
+          const isLastAssistant =
+            msg.kind === 'assistant' && i === messages.length - 1 && streaming;
+          return (
+            <Box key={msg.id} flexDirection="column" marginBottom={1}>
+              <Text color={msg.kind === 'user' ? 'green' : 'magenta'} bold>
+                {msg.kind === 'user' ? '› you' : '‹ orco'}
+              </Text>
+              {msg.kind === 'assistant' && msg.error ? (
+                <Text color="red">{msg.content}</Text>
+              ) : (
+                <Text>{msg.content || (isLastAssistant ? '…' : '')}</Text>
+              )}
+            </Box>
+          );
+        })}
       </Box>
 
       <Box flexDirection="column">
+        {approval && <ApprovalPrompt request={approval} />}
+        {infoPanel && (
+          <Box
+            flexDirection="column"
+            borderStyle="round"
+            borderColor="cyan"
+            paddingX={1}
+            paddingY={1}
+            marginY={1}
+          >
+            <Text color="cyan" bold>
+              {infoPanel.title}
+            </Text>
+            {infoPanel.lines.map((line) => (
+              <Text key={line}>{line}</Text>
+            ))}
+            <Box marginTop={1}>
+              <Text dimColor>press any key to dismiss</Text>
+            </Box>
+          </Box>
+        )}
         {showSuggestions && (
           <Box
             flexDirection="column"
@@ -94,7 +138,7 @@ export function ChatView(props: {
             {'$ '}
           </Text>
           <Box flexGrow={1}>
-            {focus === 'input' && !streaming ? (
+            {inputActive ? (
               <TextInput
                 value={input}
                 onChange={props.onInputChange}
@@ -104,9 +148,11 @@ export function ChatView(props: {
               />
             ) : (
               <Text dimColor>
-                {streaming
-                  ? 'orco is typing... (ctrl+c to cancel)'
-                  : input || 'ask orco anything...'}
+                {approval
+                  ? 'awaiting approval...'
+                  : streaming
+                    ? 'orco is typing... (ctrl+c to cancel)'
+                    : input || 'ask orco anything...'}
               </Text>
             )}
           </Box>
