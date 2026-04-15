@@ -1,3 +1,4 @@
+import { bootstrapTrading } from '../trading/index.js';
 import { askUser } from './builtin/ask-user.js';
 import { echo } from './builtin/echo.js';
 import { getTime } from './builtin/get-time.js';
@@ -14,6 +15,7 @@ export function bootstrapTools(): void {
   register(echo);
   register(askUser);
   register(todoWrite);
+  bootstrapTrading();
   const skillTool = buildSkillTool();
   if (skillTool) register(skillTool);
 }
