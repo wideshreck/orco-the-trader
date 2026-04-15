@@ -1,5 +1,6 @@
 import { register } from '../tools/registry.js';
 import { computeIndicators } from './tools/compute-indicators.js';
+import { detectSupportResistance } from './tools/detect-sr.js';
 import { getFundingRate } from './tools/get-funding-rate.js';
 import { getMarketContext } from './tools/get-market-context.js';
 import { getOhlcv } from './tools/get-ohlcv.js';
@@ -26,6 +27,7 @@ export function bootstrapTrading(): void {
   register(getMarketContext);
   register(getOpenInterest);
   register(getLongShortRatio);
+  register(detectSupportResistance);
 }
 
 export type { Candle } from './tools/get-ohlcv.js';
