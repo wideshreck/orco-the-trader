@@ -6,7 +6,14 @@ export type SessionEvent =
   | { t: 'meta'; ts: number; v: number; sessionId: SessionId; createdAt: number }
   | { t: 'model'; ts: number; providerId: string; modelId: string }
   | { t: 'user'; ts: number; id: number; content: string }
-  | { t: 'assistant'; ts: number; id: number; content: string; error?: boolean }
+  | {
+      t: 'assistant';
+      ts: number;
+      id: number;
+      content: string;
+      error?: boolean;
+      usage?: { inputTokens: number; outputTokens: number };
+    }
   | {
       t: 'tool';
       ts: number;

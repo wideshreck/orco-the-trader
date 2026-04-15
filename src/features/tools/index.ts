@@ -26,5 +26,6 @@ export type {
   OrcoTool,
   Permission,
   StreamEvent,
+  TokenUsage,
   ToolContext,
 } from './types.js';

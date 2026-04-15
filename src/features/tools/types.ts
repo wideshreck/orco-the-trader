@@ -23,11 +23,17 @@ export type ApprovalRequest = {
 
 export type ApprovalDecision = 'allow' | 'deny' | 'always';
 
+export type TokenUsage = {
+  inputTokens: number;
+  outputTokens: number;
+};
+
 export type StreamEvent =
   | { type: 'text-delta'; delta: string }
   | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }
   | { type: 'tool-result'; toolCallId: string; toolName: string; output: unknown }
   | { type: 'tool-error'; toolCallId: string; toolName: string; error: string }
-  | { type: 'approval-request'; toolCallId: string; toolName: string; input: unknown };
+  | { type: 'approval-request'; toolCallId: string; toolName: string; input: unknown }
+  | { type: 'usage'; usage: TokenUsage };
 
 export type Approver = (req: ApprovalRequest) => Promise<ApprovalDecision>;

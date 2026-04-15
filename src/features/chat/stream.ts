@@ -67,6 +67,16 @@ export async function* streamChat(
           error: errorString(part.error),
         };
         break;
+      case 'finish-step': {
+        const u = part.usage;
+        if (u && typeof u.inputTokens === 'number' && typeof u.outputTokens === 'number') {
+          yield {
+            type: 'usage',
+            usage: { inputTokens: u.inputTokens, outputTokens: u.outputTokens },
+          };
+        }
+        break;
+      }
     }
   }
 }

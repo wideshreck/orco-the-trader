@@ -3,7 +3,8 @@ import TextInput from 'ink-text-input';
 import type { SlashCommand } from '../../commands/index.js';
 import { renderMarkdown } from '../../shared/ui/markdown.js';
 import { ApprovalPrompt } from '../tools/approval-prompt.js';
-import type { ApprovalRequest } from '../tools/index.js';
+import type { ApprovalRequest, TokenUsage } from '../tools/index.js';
+import { formatTokens } from './cost.js';
 import { ToolCallView } from './tool-call-view.js';
 import type { ChatRow } from './use-chat.js';
 
@@ -26,6 +27,7 @@ export function ChatView(props: {
   suggestionIdx: number;
   approval: ApprovalRequest | null;
   infoPanel: InfoPanel | null;
+  formatUsage: (usage: TokenUsage) => string;
 }) {
   const {
     modelLabel,
@@ -43,12 +45,15 @@ export function ChatView(props: {
   } = props;
   const showSuggestions = focus === 'input' && !streaming && !approval && suggestions.length > 0;
   const inputActive = focus === 'input' && !streaming && !approval;
+  const totalTokens = sumTokens([...scrollback, ...live]);
 
   return (
     <>
       {/* Static prints each row exactly once and commits it to terminal scrollback.
           Past turns scroll up out of the dynamic area so native terminal scroll works. */}
-      <Static items={scrollback}>{(row) => <ChatRowView key={row.id} row={row} />}</Static>
+      <Static items={scrollback}>
+        {(row) => <ChatRowView key={row.id} row={row} formatUsage={props.formatUsage} />}
+      </Static>
 
       <Box flexDirection="column" paddingX={1}>
         <Box flexDirection="column" marginBottom={live.length > 0 ? 1 : 0}>
@@ -57,7 +62,14 @@ export function ChatView(props: {
           )}
           {live.map((msg, i) => {
             const isLastAssistant = msg.kind === 'assistant' && i === live.length - 1 && streaming;
-            return <ChatRowView key={msg.id} row={msg} placeholder={isLastAssistant ? '…' : ''} />;
+            return (
+              <ChatRowView
+                key={msg.id}
+                row={msg}
+                placeholder={isLastAssistant ? '…' : ''}
+                formatUsage={props.formatUsage}
+              />
+            );
           })}
         </Box>
 
@@ -143,6 +155,12 @@ export function ChatView(props: {
             <Text dimColor>{modelLabel}</Text>
             <Text dimColor> · </Text>
             <Text dimColor>{truncateLabel(sessionLabel)}</Text>
+            {totalTokens.inputTokens + totalTokens.outputTokens > 0 && (
+              <Text dimColor>
+                {' · '}
+                {formatTokens(totalTokens.inputTokens)}/{formatTokens(totalTokens.outputTokens)}
+              </Text>
+            )}
             {focus === 'tools-bar' && (
               <Text dimColor>{'  '}(↓ tools-bar focused · enter open · esc back)</Text>
             )}
@@ -179,8 +197,12 @@ export function ChatView(props: {
   );
 }
 
-function ChatRowView(props: { row: ChatRow; placeholder?: string }) {
-  const { row, placeholder = '' } = props;
+function ChatRowView(props: {
+  row: ChatRow;
+  placeholder?: string;
+  formatUsage: (usage: TokenUsage) => string;
+}) {
+  const { row, placeholder = '', formatUsage } = props;
   if (row.kind === 'tool') return <ToolCallView row={row} />;
   return (
     <Box flexDirection="column" marginBottom={1}>
@@ -194,8 +216,21 @@ function ChatRowView(props: { row: ChatRow; placeholder?: string }) {
       ) : (
         <Text>{row.content}</Text>
       )}
+      {row.kind === 'assistant' && row.usage && <Text dimColor>{formatUsage(row.usage)}</Text>}
     </Box>
   );
+}
+
+function sumTokens(rows: ChatRow[]): TokenUsage {
+  let inputTokens = 0;
+  let outputTokens = 0;
+  for (const r of rows) {
+    if (r.kind === 'assistant' && r.usage) {
+      inputTokens += r.usage.inputTokens;
+      outputTokens += r.usage.outputTokens;
+    }
+  }
+  return { inputTokens, outputTokens };
 }
 
 function truncateLabel(s: string): string {

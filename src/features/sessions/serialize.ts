@@ -9,6 +9,7 @@ export function chatRowToEvent(row: ChatRow, ts: number): SessionEvent {
   if (row.kind === 'assistant') {
     const ev: SessionEvent = { t: 'assistant', ts, id: row.id, content: row.content };
     if (row.error) ev.error = true;
+    if (row.usage) ev.usage = row.usage;
     return ev;
   }
   const ev: SessionEvent = {
@@ -33,6 +34,7 @@ export function eventsToChatRows(events: SessionEvent[]): ChatRow[] {
     } else if (ev.t === 'assistant') {
       const r: ChatRow = { id: ev.id, kind: 'assistant', content: ev.content };
       if (ev.error) r.error = true;
+      if (ev.usage) r.usage = ev.usage;
       rows.push(r);
     } else if (ev.t === 'tool') {
       const status =

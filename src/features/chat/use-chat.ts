@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { errorMessage, isAbortError } from '../../shared/errors/index.js';
 import type { CatalogProvider, ModelRef } from '../models/catalog.js';
-import type { Approver } from '../tools/index.js';
+import type { Approver, TokenUsage } from '../tools/index.js';
 import { streamChat } from './stream.js';
 
 export type UserRow = { id: number; kind: 'user'; content: string };
@@ -10,6 +10,7 @@ export type AssistantRow = {
   kind: 'assistant';
   content: string;
   error?: boolean;
+  usage?: TokenUsage;
 };
 export type ToolRow = {
   id: number;
@@ -92,6 +93,12 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
 
       let assistantAcc = '';
       let activeAssistantId = assistantId;
+      // The assistant row that corresponds to the current LLM step. A step
+      // emits text-delta → (optional) tool-call → finish-step (with usage).
+      // activeAssistantId advances immediately on tool-call to receive the
+      // next step's text, but the just-finishing step's usage still belongs
+      // to the PREVIOUS assistant row. Track it separately.
+      let stepAssistantId = assistantId;
 
       try {
         for await (const ev of streamChat(target.provider, target.ref, baseHistory, {
@@ -158,6 +165,17 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
                     : r,
                 ),
               );
+              break;
+            }
+            case 'usage': {
+              const targetId = stepAssistantId;
+              const usage = ev.usage;
+              setLive((prev) =>
+                prev.map((r) =>
+                  r.id === targetId && r.kind === 'assistant' ? { ...r, usage } : r,
+                ),
+              );
+              stepAssistantId = activeAssistantId;
               break;
             }
           }

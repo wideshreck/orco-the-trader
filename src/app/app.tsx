@@ -2,6 +2,7 @@ import { useApp, useInput } from 'ink';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { matchCommands } from '../commands/index.js';
 import { type ChatFocus, ChatView, type InfoPanel } from '../features/chat/chat-view.js';
+import { computeCost, formatUsageLine } from '../features/chat/cost.js';
 import { useChat } from '../features/chat/use-chat.js';
 import { isAuthenticated } from '../features/models/auth.js';
 import { AuthPrompt } from '../features/models/auth-prompt.js';
@@ -186,6 +187,9 @@ export function App() {
         session.startNew();
         chat.reset([]);
       },
+      messages: chat.messages,
+      catalog: catalog ?? {},
+      ref: target?.ref ?? { providerId: '', modelId: '' },
     });
     setInput('');
     if (result === 'send') void chat.send(trimmed);
@@ -259,6 +263,8 @@ export function App() {
     ? session.list().find((s) => s.id === session.currentId)
     : undefined;
   const sessionLabel = sessionMeta ? sessionMeta.title : 'new session';
+  const formatUsage = (usage: { inputTokens: number; outputTokens: number }) =>
+    formatUsageLine(usage, computeCost(usage, catalog, target.ref));
 
   return (
     <ChatView
@@ -276,6 +282,7 @@ export function App() {
       suggestionIdx={suggestionIdx}
       approval={approval.pending}
       infoPanel={infoPanel}
+      formatUsage={formatUsage}
     />
   );
 }
