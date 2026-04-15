@@ -1,7 +1,7 @@
-import { streamText, type ModelMessage } from 'ai';
-import { resolveModel } from './providers.js';
+import { type ModelMessage, streamText } from 'ai';
 import { getApiKey } from './auth.js';
 import type { CatalogProvider, ModelRef } from './catalog.js';
+import { resolveModel } from './providers.js';
 
 export type ChatMessage = {
   role: 'user' | 'assistant';
@@ -13,12 +13,12 @@ export async function* streamChat(
   ref: ModelRef,
   messages: ChatMessage[],
   signal?: AbortSignal,
-): AsyncGenerator<string> {
+): AsyncGenerator<string, void, void> {
   const apiKey = getApiKey(provider.id, provider.env);
   const model = await resolveModel({
     providerId: ref.providerId,
     modelId: ref.modelId,
-    apiKey,
+    ...(apiKey !== undefined ? { apiKey } : {}),
   });
 
   const modelMessages: ModelMessage[] = messages.map((m) => ({
@@ -29,7 +29,7 @@ export async function* streamChat(
   const result = streamText({
     model,
     messages: modelMessages,
-    abortSignal: signal,
+    ...(signal ? { abortSignal: signal } : {}),
   });
 
   for await (const chunk of result.textStream) {
