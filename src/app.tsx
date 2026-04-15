@@ -1,12 +1,14 @@
 import { useApp, useInput } from 'ink';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { type ChatFocus, ChatView } from './app/chat-view.js';
-import { matchCommands } from './app/commands.js';
+import { type ChatFocus, ChatView, type InfoPanel } from './app/chat-view.js';
+import { matchCommands, SLASH_COMMANDS } from './app/commands.js';
+import { useApproval } from './app/use-approval.js';
 import { useChat } from './app/use-chat.js';
 import { isAuthenticated } from './auth.js';
 import { type Catalog, findModel, loadCatalog, type ModelRef } from './catalog.js';
 import { type Config, loadConfig, saveConfig } from './config.js';
 import { errorMessage } from './errors.js';
+import { listActive, listAlwaysAllowed, setAlwaysAllowed } from './tools/index.js';
 import { AuthPrompt } from './ui/auth-prompt.js';
 import { Bootstrap } from './ui/bootstrap.js';
 import { ModelPicker } from './ui/model-picker.js';
@@ -29,6 +31,7 @@ export function App() {
   const [focus, setFocus] = useState<ChatFocus>('input');
   const [exitWarning, setExitWarning] = useState(false);
   const [suggestionIdx, setSuggestionIdx] = useState(0);
+  const [infoPanel, setInfoPanel] = useState<InfoPanel | null>(null);
   const warningTimer = useRef<NodeJS.Timeout | null>(null);
 
   const suggestions = useMemo(() => matchCommands(input), [input]);
@@ -47,7 +50,15 @@ export function App() {
         }
       : null;
 
-  const chat = useChat(target);
+  const approval = useApproval();
+  const chat = useChat(target, approval.approver);
+
+  // Safety: if stream ends with an unresolved approval (e.g. user aborted), deny it.
+  useEffect(() => {
+    if (!chat.streaming && approval.pending) {
+      approval.resolve('deny');
+    }
+  }, [chat.streaming, approval]);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,6 +102,26 @@ export function App() {
       setExitWarning(true);
       if (warningTimer.current) clearTimeout(warningTimer.current);
       warningTimer.current = setTimeout(() => setExitWarning(false), 2000);
+      return;
+    }
+    if (approval.pending) {
+      if (ch === 'a') {
+        approval.resolve('allow');
+        return;
+      }
+      if (ch === 'd') {
+        approval.resolve('deny');
+        return;
+      }
+      if (ch === 'A') {
+        setAlwaysAllowed(approval.pending.toolName);
+        approval.resolve('always');
+        return;
+      }
+      return;
+    }
+    if (infoPanel) {
+      setInfoPanel(null);
       return;
     }
     if (phase.kind !== 'chat') return;
@@ -142,6 +173,22 @@ export function App() {
     if (trimmed === '/clear') {
       chat.clear();
       setInput('');
+      return;
+    }
+    if (trimmed === '/tools') {
+      setInput('');
+      const allowed = new Set(listAlwaysAllowed());
+      const lines = listActive().map((t) => {
+        const tier = t.permission === 'auto' || allowed.has(t.name) ? 'auto' : 'ask';
+        return `  ${t.name.padEnd(12)} [${tier}]  ${t.description}`;
+      });
+      setInfoPanel({ title: 'tools', lines: lines.length ? lines : ['  (none registered)'] });
+      return;
+    }
+    if (trimmed === '/help') {
+      setInput('');
+      const lines = SLASH_COMMANDS.map((c) => `  ${c.name.padEnd(8)}  ${c.description}`);
+      setInfoPanel({ title: 'commands', lines });
       return;
     }
     if (trimmed === '/exit') {
@@ -211,6 +258,8 @@ export function App() {
       exitWarning={exitWarning}
       suggestions={suggestions}
       suggestionIdx={suggestionIdx}
+      approval={approval.pending}
+      infoPanel={infoPanel}
     />
   );
 }
