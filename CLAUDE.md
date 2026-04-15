@@ -1,4 +1,4 @@
-# Jarvis the Trader — Claude Code Guidance
+# ORCO the Trader — Claude Code Guidance
 
 Bu dosya Claude Code için **bağlayıcı** kurallar içerir. Her oturumda okunur, her yazım kararında uygulanır. Kural çelişirse: **güvenlik > doğruluk > kısalık > stil**.
 
@@ -6,7 +6,7 @@ Bu dosya Claude Code için **bağlayıcı** kurallar içerir. Her oturumda okunu
 
 ## 0. Proje Nedir?
 
-**Jarvis the Trader**: Terminal native (Ink tabanlı) çoklu-sağlayıcı AI chat CLI. Tek kullanıcılık, yerel çalışır, API anahtarlarını ortam değişkenlerinden okur. Gelecek hedef: tool-calling ile trading workflow'ları.
+**ORCO the Trader**: Terminal native (Ink tabanlı) çoklu-sağlayıcı AI chat CLI. Tek kullanıcılık, yerel çalışır, API anahtarlarını ortam değişkenlerinden okur. Gelecek hedef: tool-calling ile trading workflow'ları.
 
 **Stack:**
 - Runtime: Node 20+ ESM (`"type": "module"`)
@@ -40,7 +40,7 @@ import { App } from './app.ts';
 `node:` prefix kullan: `import fs from 'node:fs'`, `import path from 'node:path'`. Bare import (`'fs'`) yazma.
 
 ### `__dirname` yok
-ESM'de `__dirname` yok. Gerekirse `import.meta.url` + `fileURLToPath` kullan. Ama config dosyaları için `os.homedir()` tercih et — zaten öyle yapıyoruz (`~/.jarvis/config.json`).
+ESM'de `__dirname` yok. Gerekirse `import.meta.url` + `fileURLToPath` kullan. Ama config dosyaları için `os.homedir()` tercih et — zaten öyle yapıyoruz (`~/.config/orco/config.json`).
 
 ---
 
@@ -64,7 +64,7 @@ Ink'e Ctrl+C'yi biz yönetiyoruz diyoruz (`cli.tsx`). Stream iptal + çift Ctrl+
 Sızıntı bulursan **düzelt, not ekleme**.
 
 ### Alt-screen buffer
-`cli.tsx` terminali alt-screen'e alıyor (`\x1b[?1049h`) ve çıkarken geri veriyor. Bu sırayı kırarsan kullanıcının shell geçmişi Jarvis çıktısıyla kirlenir. Dokunma.
+`cli.tsx` terminali alt-screen'e alıyor (`\x1b[?1049h`) ve çıkarken geri veriyor. Bu sırayı kırarsan kullanıcının shell geçmişi ORCO çıktısıyla kirlenir. Dokunma.
 
 ---
 
@@ -111,8 +111,8 @@ Provider/model eşlemesi `src/models.ts`'deki `resolveModel` switch'inde. Yeni p
 
 | Ne | Nerede | TTL |
 |----|--------|-----|
-| Kullanıcı config | `~/.jarvis/config.json` | kalıcı |
-| Model catalog cache | `~/.cache/jarvis/models.json` | 1 saat, stale fallback |
+| Kullanıcı config | `~/.config/orco/config.json` | kalıcı |
+| Model catalog cache | `~/.cache/orco/models.json` | 1 saat, stale fallback |
 
 **Kurallar:**
 - Config yazarken `mkdirSync(..., { recursive: true })` — dizin yoksa oluştur.

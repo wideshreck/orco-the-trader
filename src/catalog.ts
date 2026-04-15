@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 const CATALOG_URL = 'https://models.dev/api.json';
-const CACHE_DIR = path.join(os.homedir(), '.cache', 'jarvis');
+const CACHE_DIR = path.join(os.homedir(), '.cache', 'orco');
 const CACHE_PATH = path.join(CACHE_DIR, 'models.json');
 const TTL_MS = 60 * 60 * 1000;
 

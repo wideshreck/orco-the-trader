@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const AUTH_DIR = path.join(os.homedir(), '.config', 'jarvis');
+const AUTH_DIR = path.join(os.homedir(), '.config', 'orco');
 const AUTH_PATH = path.join(AUTH_DIR, 'auth.json');
 
 export type ApiKeyAuth = { type: 'api'; key: string };

@@ -21,14 +21,14 @@ function restoreScreen(): void {
 function fatal(prefix: string, err: unknown): void {
   const msg = err instanceof Error ? `${err.message}\n${err.stack ?? ''}` : String(err);
   try {
-    fs.writeSync(process.stderr.fd, `[jarvis] ${prefix}: ${msg}\n`);
+    fs.writeSync(process.stderr.fd, `[orco] ${prefix}: ${msg}\n`);
   } catch {
     // stderr may also be closed; nothing to do
   }
 }
 
 if (!process.stdout.isTTY) {
-  process.stderr.write('jarvis requires an interactive terminal (TTY).\n');
+  process.stderr.write('orco requires an interactive terminal (TTY).\n');
   process.exit(1);
 }
 

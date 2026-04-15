@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const CONFIG_DIR = path.join(os.homedir(), '.config', 'jarvis');
+const CONFIG_DIR = path.join(os.homedir(), '.config', 'orco');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 
 export type Config = {

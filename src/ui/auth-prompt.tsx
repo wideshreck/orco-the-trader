@@ -56,9 +56,7 @@ export function AuthPrompt(props: {
         </Box>
       )}
       <Box marginTop={1}>
-        <Text dimColor>
-          enter saves · esc cancels · stored at ~/.config/jarvis/auth.json (0600)
-        </Text>
+        <Text dimColor>enter saves · esc cancels · stored at ~/.config/orco/auth.json (0600)</Text>
       </Box>
     </Box>
   );

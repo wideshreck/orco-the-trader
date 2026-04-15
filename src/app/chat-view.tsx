@@ -41,7 +41,7 @@ export function ChatView(props: {
         {messages.map((msg, i) => (
           <Box key={msg.id} flexDirection="column" marginBottom={1}>
             <Text color={msg.role === 'user' ? 'green' : 'magenta'} bold>
-              {msg.role === 'user' ? '› you' : '‹ jarvis'}
+              {msg.role === 'user' ? '› you' : '‹ orco'}
             </Text>
             {msg.error ? (
               <Text color="red">{msg.content}</Text>
@@ -99,14 +99,14 @@ export function ChatView(props: {
                 value={input}
                 onChange={props.onInputChange}
                 onSubmit={props.onSubmit}
-                placeholder="ask jarvis anything... (/model, /clear)"
+                placeholder="ask orco anything... (/model, /clear)"
                 showCursor
               />
             ) : (
               <Text dimColor>
                 {streaming
-                  ? 'jarvis is typing... (ctrl+c to cancel)'
-                  : input || 'ask jarvis anything...'}
+                  ? 'orco is typing... (ctrl+c to cancel)'
+                  : input || 'ask orco anything...'}
               </Text>
             )}
           </Box>
