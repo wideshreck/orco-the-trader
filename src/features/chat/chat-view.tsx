@@ -2,6 +2,7 @@ import { Box, Text } from 'ink';
 import TextInput from 'ink-text-input';
 import type { SlashCommand } from '../../commands/index.js';
 import { Banner } from '../../shared/ui/banner.js';
+import { renderMarkdown } from '../../shared/ui/markdown.js';
 import { ApprovalPrompt } from '../tools/approval-prompt.js';
 import type { ApprovalRequest } from '../tools/index.js';
 import { ToolCallView } from './tool-call-view.js';
@@ -71,8 +72,12 @@ export function ChatView(props: {
               </Text>
               {msg.kind === 'assistant' && msg.error ? (
                 <Text color="red">{msg.content}</Text>
+              ) : msg.kind === 'assistant' ? (
+                <Text>
+                  {msg.content ? renderMarkdown(msg.content) : isLastAssistant ? '…' : ''}
+                </Text>
               ) : (
-                <Text>{msg.content || (isLastAssistant ? '…' : '')}</Text>
+                <Text>{msg.content}</Text>
               )}
             </Box>
           );
