@@ -51,7 +51,11 @@ export function dispatchCommand(trimmed: string, ctx: DispatchCtx): DispatchResu
     const lines = listActive().map((t) => {
       const perm = effectivePermission(t);
       const tier = perm === 'auto' || allowed.has(t.name) ? 'auto' : 'ask';
-      return `  ${t.name.padEnd(12)} [${tier}]  ${t.description}`;
+      // Tool descriptions are multi-line prompts for the LLM. The panel only
+      // needs the first sentence — a one-line at-a-glance summary.
+      const summary = t.description.split('\n')[0]?.trim() ?? '';
+      const clipped = summary.length > 80 ? `${summary.slice(0, 79)}…` : summary;
+      return `  ${t.name.padEnd(18)} [${tier}]  ${clipped}`;
     });
     ctx.setInfoPanel({ title: 'tools', lines: lines.length ? lines : ['  (none registered)'] });
     return 'handled';
