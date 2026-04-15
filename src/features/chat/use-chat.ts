@@ -81,10 +81,14 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
     [],
   );
 
-  // /new and /clear: just clear the live area; scrollback stays printed.
+  // /new and /clear: wipe everything — scrollback state, live area, compaction
+  // point, committed ids. The parent is expected to also clear the terminal
+  // (process.stdout.write '\x1b[2J\x1b[3J\x1b[H') so the visual slate matches.
   const clear = useCallback(() => {
+    setScrollback([]);
     setLive([]);
     setCompactionPoint(null);
+    committedIdsRef.current = new Set();
   }, []);
 
   const send = useCallback(

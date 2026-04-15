@@ -336,7 +336,9 @@ export function App() {
       clearChat: () => {
         if (chat.streaming) chat.cancel();
         session.startNew();
-        chat.reset({ rows: [], compactionPoint: null });
+        chat.clear();
+        // Wipe the terminal — erase screen, erase scrollback, home cursor.
+        process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
       },
       compactChat: async () => {
         const outcome = await chat.compact();
