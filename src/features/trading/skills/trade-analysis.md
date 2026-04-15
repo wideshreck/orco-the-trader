@@ -20,6 +20,12 @@ If the user asks "top movers", "what's pumping", "scan the market", or gives a l
 
 Only after filtering down to 1–3 interesting symbols do you proceed to the per-symbol deep-dive below (get_ohlcv + compute_indicators + order book / funding).
 
+## 1c. Multi-timeframe confluence
+
+When the user wants a strong signal ("is this a good entry", "swing setup on X"), prefer `multi_timeframe_analysis` over running `get_ohlcv` + `compute_indicators` three times. It runs the same indicator set across 1h / 4h / 1d (or a custom set) in parallel and returns per-TF trend/momentum/strength biases plus an `alignment` summary.
+
+Use the `alignment.aligned` boolean (≥75% of TFs agree on direction) as a gate: trade setups in the direction of alignment have meaningfully higher odds. If alignment is false, say the TFs disagree and either drop the trade or pick the higher-TF bias.
+
 ## 2. Fetch data
 
 Call `get_ohlcv` with a Binance spot pair (BTCUSDT, ETHUSDT, etc.). Pick the interval by horizon:

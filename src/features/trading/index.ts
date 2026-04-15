@@ -5,6 +5,7 @@ import { getOhlcv } from './tools/get-ohlcv.js';
 import { getOrderBook } from './tools/get-order-book.js';
 import { getTicker24h } from './tools/get-ticker-24h.js';
 import { listTopSymbols } from './tools/list-top-symbols.js';
+import { multiTimeframeAnalysis } from './tools/multi-tf.js';
 import { scanMarket } from './tools/scan-market.js';
 
 let bootstrapped = false;
@@ -19,6 +20,7 @@ export function bootstrapTrading(): void {
   register(getFundingRate);
   register(listTopSymbols);
   register(scanMarket);
+  register(multiTimeframeAnalysis);
 }
 
 export type { Candle } from './tools/get-ohlcv.js';
