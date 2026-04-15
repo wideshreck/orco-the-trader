@@ -6,6 +6,7 @@ import { App } from '../app/app.js';
 import { shutdownMcp } from '../features/mcp/index.js';
 import { logger } from '../shared/logging/logger.js';
 import { printBannerToStdout } from '../shared/ui/banner.js';
+import { ErrorBoundary } from '../shared/ui/error-boundary.js';
 
 function fatal(prefix: string, err: unknown): void {
   const msg = err instanceof Error ? `${err.message}\n${err.stack ?? ''}` : String(err);
@@ -52,7 +53,12 @@ process.on('unhandledRejection', (reason) => {
 
 logger.info('runtime', 'orco starting');
 
-const app = render(<App />, { exitOnCtrlC: false });
+const app = render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>,
+  { exitOnCtrlC: false },
+);
 
 void app.waitUntilExit().finally(() => {
   void shutdownMcp();
