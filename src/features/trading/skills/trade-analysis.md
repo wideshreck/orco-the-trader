@@ -11,6 +11,15 @@ Follow this workflow precisely when the user asks for market analysis. Do not sk
 
 If the user's request is genuinely ambiguous (no symbol, no timeframe), call `ask_user` with specific choices rather than guessing. Skip this step when the intent is clear.
 
+## 1b. Multi-symbol requests
+
+If the user asks "top movers", "what's pumping", "scan the market", or gives a list of symbols to compare — do NOT run the single-symbol workflow per coin. Instead:
+
+- Starting blind? Call `list_top_symbols` (sortBy `gainers` / `losers` / `volume`). Cheap, one request. Take the top 5–15 results as the candidate set.
+- Already have the candidate set? Call `scan_market` with the symbols and the chosen interval. It returns ticker + RSI + SMA deviation + interval-change per symbol in one response — ~2 requests per symbol, run in parallel.
+
+Only after filtering down to 1–3 interesting symbols do you proceed to the per-symbol deep-dive below (get_ohlcv + compute_indicators + order book / funding).
+
 ## 2. Fetch data
 
 Call `get_ohlcv` with a Binance spot pair (BTCUSDT, ETHUSDT, etc.). Pick the interval by horizon:
