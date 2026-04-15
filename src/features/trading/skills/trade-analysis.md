@@ -24,6 +24,12 @@ Call `get_ohlcv` with a Binance spot pair (BTCUSDT, ETHUSDT, etc.). Pick the int
 
 Fetch 200 candles by default (enough history for sma200 when relevant; fewer if the interval or pair does not support it).
 
+For a full market read also call:
+
+- `get_ticker_24h` once — 24h change, high/low, volume. Low `quoteVolume` (< 10M USDT for alts, < 100M for majors) means thin liquidity; widen stops or skip.
+- `get_order_book` (limit 50 or 100) when the user asks about short-term direction or a scalp entry. Read `imbalance` (>0.6 bullish pressure, <0.4 bearish), `spreadPct` (>0.1% = thin book), and any visible walls in top levels.
+- `get_funding_rate` when the symbol has a perp and the horizon is intraday / swing. |rate| > 0.05% is extreme — contrarian bias. Skip for low-cap spot-only pairs.
+
 ## 3. Compute indicators
 
 Always use `compute_indicators` — never estimate these by reading candles. Recommended default set:
@@ -42,7 +48,9 @@ Summarize the structure in this exact order (keeps the output scannable):
 2. **Trend** — price vs sma20/sma50 (and sma200 if present). Stacking order tells the trend.
 3. **Momentum** — RSI reading (overbought > 70, oversold < 30, neutral 40–60); MACD line vs signal and histogram direction.
 4. **Volatility** — ATR in price units AND as a % of close. High vs recent norm → tighter stops or wider.
-5. **Volume** — recent avg vs longer avg if the user asks or it stands out.
+5. **Volume** — 24h `quoteVolume` from ticker; recent candle volume vs avg if it stands out.
+6. **Order flow** (if fetched) — bid/ask imbalance, spread, nearby walls.
+7. **Funding** (if fetched) — rate + pct. Extreme readings flip the bias toward a fade.
 
 ## 5. Recommendation (if user asked for a trade)
 
