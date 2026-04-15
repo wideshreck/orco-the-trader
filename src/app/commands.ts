@@ -4,16 +4,14 @@ export type SlashCommand = {
 };
 
 export const SLASH_COMMANDS: readonly SlashCommand[] = [
-  { name: '/clear', description: 'clear chat history' },
+  { name: '/clear', description: 'start a new session (alias of /new)' },
   { name: '/exit', description: 'exit orco' },
   { name: '/help', description: 'show all commands' },
   { name: '/model', description: 'select model' },
+  { name: '/new', description: 'start a new session' },
+  { name: '/sessions', description: 'browse and switch sessions' },
   { name: '/tools', description: 'list registered tools' },
 ] as const;
-
-export function isKnownCommand(name: string): boolean {
-  return SLASH_COMMANDS.some((c) => c.name === name);
-}
 
 export function matchCommands(input: string): SlashCommand[] {
   if (!input.startsWith('/')) return [];
@@ -21,4 +19,8 @@ export function matchCommands(input: string): SlashCommand[] {
   const matches = SLASH_COMMANDS.filter((c) => c.name.startsWith(q));
   if (matches.length === 1 && matches[0]?.name === input) return [];
   return matches;
+}
+
+export function isKnownCommand(name: string): boolean {
+  return SLASH_COMMANDS.some((c) => c.name === name);
 }
