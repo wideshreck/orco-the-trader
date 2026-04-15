@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { Asker, QuestionRequest } from './index.js';
 
 type Pending = QuestionRequest & { resolve: (answer: string) => void };
@@ -29,13 +29,14 @@ export function useQuestion(): QuestionChannel {
     entry.resolve(answer);
   }, []);
 
-  return {
-    pending: pending
-      ? pending.choices
-        ? { question: pending.question, choices: pending.choices }
-        : { question: pending.question }
-      : null,
-    asker,
-    resolve,
-  };
+  // Memoize the public view so `pending`'s identity only changes when a new
+  // question arrives (not on every render). Effects that depend on it can then
+  // reliably distinguish "new question" from "same question, re-render".
+  const view = useMemo<QuestionRequest | null>(() => {
+    if (!pending) return null;
+    if (pending.choices) return { question: pending.question, choices: pending.choices };
+    return { question: pending.question };
+  }, [pending]);
+
+  return { pending: view, asker, resolve };
 }
