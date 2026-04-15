@@ -8,6 +8,7 @@ import { listMcpServers } from '../features/mcp/index.js';
 import type { Catalog, ModelRef } from '../features/models/catalog.js';
 import { listSkills, skillsDir } from '../features/skills/index.js';
 import { listActive, listAlwaysAllowed } from '../features/tools/index.js';
+import { isLoggingEnabled, logFilePath } from '../shared/logging/logger.js';
 
 export type Phase =
   | { kind: 'bootstrap'; status: string; error?: string | null }
@@ -58,6 +59,25 @@ export function dispatchCommand(trimmed: string, ctx: DispatchCtx): DispatchResu
   }
   if (trimmed === '/compact') {
     ctx.compactChat();
+    return 'handled';
+  }
+  if (trimmed === '/log') {
+    const file = logFilePath().replace(os.homedir(), '~');
+    if (isLoggingEnabled()) {
+      ctx.setInfoPanel({
+        title: 'log',
+        lines: [`  active · level from ORCO_LOG env`, `  file: ${file}`, `  tail: tail -f ${file}`],
+      });
+    } else {
+      ctx.setInfoPanel({
+        title: 'log',
+        lines: [
+          '  disabled — set ORCO_LOG=debug (or info/warn/error) before launch',
+          `  file (if enabled): ${file}`,
+          '  levels: debug · info · warn · error',
+        ],
+      });
+    }
     return 'handled';
   }
   if (trimmed === '/mcp') {

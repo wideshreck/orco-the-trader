@@ -1,4 +1,5 @@
 import { stepCountIs, streamText } from 'ai';
+import { logger } from '../../shared/logging/logger.js';
 import { getMcpTools } from '../mcp/index.js';
 import { getApiKey } from '../models/auth.js';
 import type { CatalogProvider, ModelRef } from '../models/catalog.js';
@@ -33,6 +34,12 @@ export async function* streamChat(
   const nativeTools = buildAiSdkTools({ approver: opts.approver, signal: opts.signal });
   const mcpTools = getMcpTools(opts.approver);
   const tools = { ...nativeTools, ...mcpTools };
+  logger.debug('stream', 'starting', {
+    provider: ref.providerId,
+    model: ref.modelId,
+    messages: modelMessages.length,
+    tools: Object.keys(tools).length,
+  });
 
   const result = streamText({
     model,
@@ -49,6 +56,7 @@ export async function* streamChat(
         yield { type: 'text-delta', delta: part.text };
         break;
       case 'tool-call':
+        logger.info('stream', 'tool-call', { name: part.toolName, id: part.toolCallId });
         yield {
           type: 'tool-call',
           toolCallId: part.toolCallId,
@@ -65,6 +73,10 @@ export async function* streamChat(
         };
         break;
       case 'tool-error':
+        logger.warn('stream', 'tool-error', {
+          name: part.toolName,
+          error: errorString(part.error),
+        });
         yield {
           type: 'tool-error',
           toolCallId: part.toolCallId,

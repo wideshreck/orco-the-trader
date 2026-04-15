@@ -1,4 +1,5 @@
 import type { ToolSet } from 'ai';
+import { logger } from '../../shared/logging/logger.js';
 import type { Approver } from '../tools/types.js';
 import { type ConnectedServer, connectServer, gateMcpTools } from './client.js';
 import type { McpServerConfig, McpServerEntry, McpServerStatus } from './types.js';
@@ -21,20 +22,21 @@ export async function bootstrapMcp(
   await Promise.all(
     Object.entries(servers).map(async ([name, config]) => {
       registry.set(name, { name, config, status: { state: 'connecting' } });
+      logger.info('mcp', 'connecting', { name, url: config.url });
       try {
         const conn = await connectServer(name, config);
         clients.set(name, conn);
+        const toolCount = Object.keys(conn.tools).length;
         registry.set(name, {
           name,
           config,
-          status: { state: 'ready', toolCount: Object.keys(conn.tools).length },
+          status: { state: 'ready', toolCount },
         });
+        logger.info('mcp', 'ready', { name, toolCount });
       } catch (err) {
-        registry.set(name, {
-          name,
-          config,
-          status: { state: 'failed', error: errorToString(err) },
-        });
+        const error = errorToString(err);
+        registry.set(name, { name, config, status: { state: 'failed', error } });
+        logger.error('mcp', 'connect failed', { name, error });
       }
     }),
   );

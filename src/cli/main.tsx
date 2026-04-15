@@ -4,6 +4,7 @@ import process from 'node:process';
 import { render } from 'ink';
 import { App } from '../app/app.js';
 import { shutdownMcp } from '../features/mcp/index.js';
+import { logger } from '../shared/logging/logger.js';
 import { printBannerToStdout } from '../shared/ui/banner.js';
 
 function fatal(prefix: string, err: unknown): void {
@@ -35,14 +36,21 @@ for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
 }
 
 process.on('uncaughtException', (err) => {
+  logger.error('runtime', 'uncaughtException', {
+    message: err instanceof Error ? err.message : String(err),
+    stack: err instanceof Error ? err.stack : undefined,
+  });
   fatal('uncaught exception', err);
   process.exit(1);
 });
 
 process.on('unhandledRejection', (reason) => {
+  logger.error('runtime', 'unhandledRejection', { reason: String(reason) });
   fatal('unhandled rejection', reason);
   process.exit(1);
 });
+
+logger.info('runtime', 'orco starting');
 
 const app = render(<App />, { exitOnCtrlC: false });
 

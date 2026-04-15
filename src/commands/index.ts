@@ -9,6 +9,7 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
   { name: '/cost', description: 'show token usage and cost breakdown' },
   { name: '/exit', description: 'exit orco' },
   { name: '/help', description: 'show all commands' },
+  { name: '/log', description: 'show debug log path and status' },
   { name: '/mcp', description: 'list configured MCP servers and their status' },
   { name: '/model', description: 'select model' },
   { name: '/new', description: 'start a new session' },
