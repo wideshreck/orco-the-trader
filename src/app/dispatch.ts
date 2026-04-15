@@ -7,7 +7,7 @@ import type { ChatRow } from '../features/chat/use-chat.js';
 import { listMcpServers } from '../features/mcp/index.js';
 import type { Catalog, ModelRef } from '../features/models/catalog.js';
 import { listSkills, skillsDir } from '../features/skills/index.js';
-import { listActive, listAlwaysAllowed } from '../features/tools/index.js';
+import { effectivePermission, listActive, listAlwaysAllowed } from '../features/tools/index.js';
 import { isLoggingEnabled, logFilePath } from '../shared/logging/logger.js';
 
 export type Phase =
@@ -23,10 +23,12 @@ export type DispatchCtx = {
   exit: () => void;
   clearChat: () => void;
   compactChat: () => void;
+  reloadMcpServers: () => void;
   messages: ChatRow[];
   catalog: Catalog;
   ref: ModelRef;
   systemPrompt?: string;
+  config: { providerId?: string; modelId?: string; mcpServerCount: number };
 };
 
 export type DispatchResult = 'handled' | 'unknown' | 'send';
@@ -47,7 +49,8 @@ export function dispatchCommand(trimmed: string, ctx: DispatchCtx): DispatchResu
   if (trimmed === '/tools') {
     const allowed = new Set(listAlwaysAllowed());
     const lines = listActive().map((t) => {
-      const tier = t.permission === 'auto' || allowed.has(t.name) ? 'auto' : 'ask';
+      const perm = effectivePermission(t);
+      const tier = perm === 'auto' || allowed.has(t.name) ? 'auto' : 'ask';
       return `  ${t.name.padEnd(12)} [${tier}]  ${t.description}`;
     });
     ctx.setInfoPanel({ title: 'tools', lines: lines.length ? lines : ['  (none registered)'] });
@@ -59,6 +62,22 @@ export function dispatchCommand(trimmed: string, ctx: DispatchCtx): DispatchResu
   }
   if (trimmed === '/compact') {
     ctx.compactChat();
+    return 'handled';
+  }
+  if (trimmed === '/config') {
+    const file = path.join('~', '.config', 'orco', 'config.json');
+    const c = ctx.config;
+    const lines = [
+      `  file: ${file}`,
+      '',
+      `  provider:   ${c.providerId ?? '(unset)'}`,
+      `  model:      ${c.modelId ?? '(unset)'}`,
+      `  systemPrompt: ${ctx.systemPrompt ? 'set' : '(none)'}`,
+      `  mcpServers: ${c.mcpServerCount}`,
+      '',
+      '  edit the file then restart orco to apply',
+    ];
+    ctx.setInfoPanel({ title: 'config', lines });
     return 'handled';
   }
   if (trimmed === '/log') {
@@ -78,6 +97,14 @@ export function dispatchCommand(trimmed: string, ctx: DispatchCtx): DispatchResu
         ],
       });
     }
+    return 'handled';
+  }
+  if (trimmed === '/mcp reload' || trimmed === '/mcp-reload') {
+    ctx.reloadMcpServers();
+    ctx.setInfoPanel({
+      title: 'mcp',
+      lines: ['  reloading servers — /mcp to check status'],
+    });
     return 'handled';
   }
   if (trimmed === '/mcp') {

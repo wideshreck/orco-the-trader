@@ -21,7 +21,14 @@ export {
   setAlwaysAllowed,
 } from './approvals.js';
 export { defineTool } from './define.js';
-export { buildAiSdkTools, get, listActive, listAll } from './registry.js';
+export {
+  buildAiSdkTools,
+  effectivePermission,
+  get,
+  listActive,
+  listAll,
+  setPermissionOverrides,
+} from './registry.js';
 export type {
   ApprovalDecision,
   ApprovalRequest,

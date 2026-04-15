@@ -16,11 +16,14 @@ export type McpServerConfig = {
   headers?: Record<string, string>;
 };
 
+export type ToolPermission = 'auto' | 'ask' | 'deny';
+
 export type Config = {
   providerId?: string;
   modelId?: string;
   systemPrompt?: string;
   mcpServers?: Record<string, McpServerConfig>;
+  toolOverrides?: Record<string, ToolPermission>;
 };
 
 function isObject(v: unknown): v is Record<string, unknown> {
@@ -56,6 +59,15 @@ export function loadConfig(): Config {
         if (parsed) servers[name] = parsed;
       }
       if (Object.keys(servers).length > 0) cfg.mcpServers = servers;
+    }
+    if (isObject(raw.toolOverrides)) {
+      const overrides: Record<string, ToolPermission> = {};
+      for (const [name, value] of Object.entries(raw.toolOverrides)) {
+        if (value === 'auto' || value === 'ask' || value === 'deny') {
+          overrides[name] = value;
+        }
+      }
+      if (Object.keys(overrides).length > 0) cfg.toolOverrides = overrides;
     }
     return cfg;
   } catch {

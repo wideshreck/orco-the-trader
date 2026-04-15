@@ -1,8 +1,9 @@
 import { tool as aiTool, type ToolSet } from 'ai';
 import { isAlwaysAllowed } from './approvals.js';
-import type { Approver, OrcoTool } from './types.js';
+import type { Approver, OrcoTool, Permission } from './types.js';
 
 const REGISTRY = new Map<string, OrcoTool<unknown, unknown>>();
+let overrides: Record<string, Permission> = {};
 
 export function register<I, O>(tool: OrcoTool<I, O>): void {
   if (REGISTRY.has(tool.name)) {
@@ -11,12 +12,20 @@ export function register<I, O>(tool: OrcoTool<I, O>): void {
   REGISTRY.set(tool.name, tool as unknown as OrcoTool<unknown, unknown>);
 }
 
+export function setPermissionOverrides(next: Record<string, Permission>): void {
+  overrides = { ...next };
+}
+
+export function effectivePermission(tool: OrcoTool<unknown, unknown>): Permission {
+  return overrides[tool.name] ?? tool.permission;
+}
+
 export function listAll(): OrcoTool<unknown, unknown>[] {
   return [...REGISTRY.values()];
 }
 
 export function listActive(): OrcoTool<unknown, unknown>[] {
-  return listAll().filter((t) => t.permission !== 'deny');
+  return listAll().filter((t) => effectivePermission(t) !== 'deny');
 }
 
 export function get(name: string): OrcoTool<unknown, unknown> | undefined {
@@ -37,7 +46,7 @@ export function buildAiSdkTools(opts: {
         if (!parsed.success) {
           throw new Error(`invalid input: ${parsed.error.message}`);
         }
-        const needsApproval = t.permission === 'ask' && !isAlwaysAllowed(t.name);
+        const needsApproval = effectivePermission(t) === 'ask' && !isAlwaysAllowed(t.name);
         if (needsApproval) {
           const decision = await opts.approver({
             toolCallId: callCtx.toolCallId,

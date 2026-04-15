@@ -50,6 +50,13 @@ export async function shutdownMcp(): Promise<void> {
   await Promise.all(closing);
 }
 
+export async function reloadMcp(
+  servers: Record<string, McpServerConfig> | undefined,
+): Promise<void> {
+  await shutdownMcp();
+  await bootstrapMcp(servers);
+}
+
 export function listMcpServers(): McpServerEntry[] {
   return [...registry.values()];
 }

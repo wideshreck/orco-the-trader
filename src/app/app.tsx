@@ -4,14 +4,14 @@ import { matchCommands } from '../commands/index.js';
 import { type ChatFocus, ChatView, type InfoPanel } from '../features/chat/chat-view.js';
 import { computeCost, formatUsageLine } from '../features/chat/cost.js';
 import { useChat } from '../features/chat/use-chat.js';
-import { bootstrapMcp } from '../features/mcp/index.js';
+import { bootstrapMcp, reloadMcp } from '../features/mcp/index.js';
 import { isAuthenticated } from '../features/models/auth.js';
 import { AuthPrompt } from '../features/models/auth-prompt.js';
 import { type Catalog, findModel, loadCatalog, type ModelRef } from '../features/models/catalog.js';
 import { ModelPicker } from '../features/models/model-picker.js';
 import { SessionPicker } from '../features/sessions/session-picker.js';
 import { useSession } from '../features/sessions/use-session.js';
-import { setAlwaysAllowed } from '../features/tools/index.js';
+import { setAlwaysAllowed, setPermissionOverrides } from '../features/tools/index.js';
 import { useApproval } from '../features/tools/use-approval.js';
 import { type Config, loadConfig, saveConfig } from '../shared/config/user-config.js';
 import { errorMessage } from '../shared/errors/index.js';
@@ -72,6 +72,10 @@ export function App() {
       approval.resolve('deny');
     }
   }, [chat.streaming, approval]);
+
+  useEffect(() => {
+    setPermissionOverrides(config.toolOverrides ?? {});
+  }, [config.toolOverrides]);
 
   useEffect(() => {
     let cancelled = false;
@@ -225,6 +229,15 @@ export function App() {
       catalog: catalog ?? {},
       ref: target?.ref ?? { providerId: '', modelId: '' },
       ...(config.systemPrompt ? { systemPrompt: config.systemPrompt } : {}),
+      config: {
+        ...(config.providerId ? { providerId: config.providerId } : {}),
+        ...(config.modelId ? { modelId: config.modelId } : {}),
+        mcpServerCount: Object.keys(config.mcpServers ?? {}).length,
+      },
+      reloadMcpServers: () => {
+        // Fire-and-forget: /mcp will show updated status once it settles.
+        void reloadMcp(loadConfig().mcpServers);
+      },
     });
     setInput('');
     if (result === 'send') void chat.send(trimmed);
