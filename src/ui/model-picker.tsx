@@ -1,6 +1,6 @@
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { isAuthenticated } from '../auth.js';
 import type { Catalog, CatalogModel, CatalogProvider, ModelRef } from '../catalog.js';
 import { isSupportedProvider } from '../providers.js';

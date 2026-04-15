@@ -1,5 +1,4 @@
 import { Box, Text } from 'ink';
-import React from 'react';
 import { Banner } from '../app/banner.js';
 
 export function Bootstrap(props: { status: string; error?: string | null }) {

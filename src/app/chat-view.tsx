@@ -1,0 +1,125 @@
+import { Box, Text } from 'ink';
+import TextInput from 'ink-text-input';
+import { Banner } from './banner.js';
+import type { ChatRow } from './use-chat.js';
+
+export type ChatFocus = 'input' | 'tools-bar' | 'tools-panel';
+
+export function ChatView(props: {
+  modelLabel: string;
+  messages: ChatRow[];
+  streaming: boolean;
+  input: string;
+  onInputChange: (v: string) => void;
+  onSubmit: (v: string) => void;
+  focus: ChatFocus;
+  exitWarning: boolean;
+}) {
+  const { modelLabel, messages, streaming, input, focus, exitWarning } = props;
+  return (
+    <Box flexDirection="column" padding={1}>
+      <Box marginBottom={1}>
+        <Banner
+          subtitle={
+            <Box>
+              <Text dimColor>The Trader v0.1 · </Text>
+              <Text color="magenta">{modelLabel}</Text>
+            </Box>
+          }
+        />
+      </Box>
+
+      <Box flexDirection="column" marginBottom={1}>
+        {messages.length === 0 && (
+          <Text dimColor>Type a message and press enter · /model select model · /clear reset</Text>
+        )}
+        {messages.map((msg, i) => (
+          <Box key={msg.id} flexDirection="column" marginBottom={1}>
+            <Text color={msg.role === 'user' ? 'green' : 'magenta'} bold>
+              {msg.role === 'user' ? '› you' : '‹ jarvis'}
+            </Text>
+            {msg.error ? (
+              <Text color="red">{msg.content}</Text>
+            ) : (
+              <Text>{msg.content || (streaming && i === messages.length - 1 ? '…' : '')}</Text>
+            )}
+          </Box>
+        ))}
+      </Box>
+
+      <Box flexDirection="column">
+        <Box
+          borderStyle="round"
+          borderColor={focus === 'input' && input.length > 0 ? 'cyan' : 'gray'}
+          paddingX={1}
+        >
+          <Text color="cyan" bold>
+            {'$ '}
+          </Text>
+          <Box flexGrow={1}>
+            {focus === 'input' && !streaming ? (
+              <TextInput
+                value={input}
+                onChange={props.onInputChange}
+                onSubmit={props.onSubmit}
+                placeholder="ask jarvis anything... (/model, /clear)"
+                showCursor
+              />
+            ) : (
+              <Text dimColor>
+                {streaming
+                  ? 'jarvis is typing... (ctrl+c to cancel)'
+                  : input || 'ask jarvis anything...'}
+              </Text>
+            )}
+          </Box>
+        </Box>
+
+        <Box paddingX={2} justifyContent="space-between">
+          <Box>
+            {focus === 'tools-bar' ? (
+              <Text color="cyan" inverse>
+                {' tools '}
+              </Text>
+            ) : (
+              <Text dimColor>tools</Text>
+            )}
+            <Text dimColor>
+              {focus === 'input'
+                ? '  (↓ to focus)'
+                : focus === 'tools-bar'
+                  ? '  (enter to open · esc to close)'
+                  : ''}
+            </Text>
+          </Box>
+          {exitWarning ? (
+            <Text color="yellow">press ctrl+c again to exit</Text>
+          ) : (
+            <Text dimColor>/model · ctrl+c to exit</Text>
+          )}
+        </Box>
+
+        {focus === 'tools-panel' && (
+          <Box
+            flexDirection="column"
+            borderStyle="round"
+            borderColor="cyan"
+            paddingX={1}
+            paddingY={1}
+            marginTop={1}
+          >
+            <Text color="cyan" bold>
+              tools
+            </Text>
+            <Box marginTop={1}>
+              <Text dimColor>no tools yet — coming soon...</Text>
+            </Box>
+            <Box marginTop={1}>
+              <Text dimColor>esc to close</Text>
+            </Box>
+          </Box>
+        )}
+      </Box>
+    </Box>
+  );
+}
