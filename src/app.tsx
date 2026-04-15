@@ -163,8 +163,14 @@ export function App() {
   }, []);
 
   const handleSubmit = (value: string) => {
-    const trimmed = value.trim();
+    let trimmed = value.trim();
     if (!trimmed) return;
+    // If the autocomplete dropdown is open, Enter executes the highlighted suggestion
+    // even if the user typed a partial/ambiguous prefix (e.g. "/tool" → "/tools").
+    if (trimmed.startsWith('/') && suggestions.length > 0) {
+      const pick = suggestions[suggestionIdx];
+      if (pick) trimmed = pick.name;
+    }
     if (trimmed === '/model') {
       setInput('');
       setPhase({ kind: 'picker' });
