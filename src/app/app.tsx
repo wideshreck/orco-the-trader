@@ -32,6 +32,9 @@ export function App() {
   const [suggestionIdx, setSuggestionIdx] = useState(0);
   const [suggestionsDismissedFor, setSuggestionsDismissedFor] = useState<string | null>(null);
   const [infoPanel, setInfoPanel] = useState<InfoPanel | null>(null);
+  // Messages typed while the assistant is streaming get queued and drained
+  // FIFO when the stream settles.
+  const [queue, setQueue] = useState<string[]>([]);
   // Up/down arrow cycles through previously-sent user messages when the input
   // is focused and the suggestion dropdown is not open.
   const historyIdxRef = useRef<number | null>(null);
@@ -76,6 +79,20 @@ export function App() {
       approval.resolve('deny');
     }
   }, [chat.streaming, approval]);
+
+  // Drain one queued submission each time the stream settles. Running it via
+  // handleSubmitRef.current keeps slash-command dispatch consistent for queued
+  // inputs without pulling handleSubmit into the effect's dep list.
+  const handleSubmitRef = useRef<(v: string) => void>(() => undefined);
+  useEffect(() => {
+    if (chat.streaming) return;
+    if (approval.pending) return;
+    if (queue.length === 0) return;
+    const [next, ...rest] = queue;
+    if (!next) return;
+    setQueue(rest);
+    handleSubmitRef.current(next);
+  }, [chat.streaming, approval.pending, queue]);
 
   // Auto-compact when the last turn's input tokens cross 90% of the model's
   // context window. Fires once per turn after the stream settles.
@@ -253,6 +270,13 @@ export function App() {
       const pick = suggestions[suggestionIdx];
       if (pick) trimmed = pick.name;
     }
+    // If a stream is in flight or we're waiting on approval, enqueue the
+    // submission and let the drain effect flush it later.
+    if (chat.streaming || approval.pending) {
+      setQueue((q) => [...q, trimmed]);
+      setInput('');
+      return;
+    }
     const result = dispatchCommand(trimmed, {
       setPhase,
       setInfoPanel,
@@ -306,6 +330,7 @@ export function App() {
     setInput('');
     if (result === 'send') void chat.send(trimmed);
   };
+  handleSubmitRef.current = handleSubmit;
 
   if (phase.kind === 'bootstrap') {
     return <Bootstrap status={phase.status} error={phase.error ?? null} />;
@@ -399,6 +424,7 @@ export function App() {
       formatUsage={formatUsage}
       contextLimit={contextLimit}
       compactionActive={chat.compactionPoint !== null}
+      queue={queue}
     />
   );
 }

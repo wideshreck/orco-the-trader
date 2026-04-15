@@ -30,6 +30,7 @@ export function ChatView(props: {
   formatUsage: (usage: TokenUsage) => string;
   contextLimit: number | null;
   compactionActive: boolean;
+  queue: string[];
 }) {
   const {
     modelLabel,
@@ -46,7 +47,10 @@ export function ChatView(props: {
     infoPanel,
   } = props;
   const showSuggestions = focus === 'input' && !streaming && !approval && suggestions.length > 0;
-  const inputActive = focus === 'input' && !streaming && !approval;
+  // Input stays typeable while streaming / awaiting approval: submissions
+  // are queued by the parent and drained when the slot clears.
+  const inputActive = focus === 'input' && !approval;
+  const { queue } = props;
   const totalTokens = sumTokens([...scrollback, ...live]);
   const lastInputTokens = lastTurnInput([...scrollback, ...live]);
   const { contextLimit, compactionActive } = props;
@@ -144,16 +148,16 @@ export function ChatView(props: {
                 value={input}
                 onChange={props.onInputChange}
                 onSubmit={props.onSubmit}
-                placeholder="ask orco anything... (/help · shift+enter or \\ for newline)"
+                placeholder={
+                  streaming
+                    ? 'orco is typing — your next message will queue...'
+                    : 'ask orco anything... (/help · shift+enter or \\ for newline)'
+                }
                 isActive={inputActive}
               />
             ) : (
               <Text dimColor>
-                {approval
-                  ? 'awaiting approval...'
-                  : streaming
-                    ? 'orco is typing... (ctrl+c to cancel)'
-                    : input || 'ask orco anything...'}
+                {approval ? 'awaiting approval...' : input || 'ask orco anything...'}
               </Text>
             )}
           </Box>
@@ -185,6 +189,12 @@ export function ChatView(props: {
               </Text>
             )}
             {compactionActive && <Text color="cyan">{' · compacted'}</Text>}
+            {queue.length > 0 && (
+              <Text color="yellow">
+                {' · '}
+                {queue.length} queued
+              </Text>
+            )}
             {focus === 'tools-bar' && (
               <Text dimColor>{'  '}(↓ tools-bar focused · enter open · esc back)</Text>
             )}
