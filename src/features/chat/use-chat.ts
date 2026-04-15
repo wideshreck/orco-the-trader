@@ -61,6 +61,27 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  // As soon as a tool row reaches a terminal status (done / error / denied)
+  // move it out of the dynamic live area into scrollback. This keeps the
+  // live block short so Ink's in-place redraws don't overflow the terminal
+  // and leak old frames into scrollback on long responses.
+  useEffect(() => {
+    const settled = live.filter(
+      (r) =>
+        r.kind === 'tool' &&
+        (r.status === 'done' || r.status === 'error' || r.status === 'denied'),
+    );
+    if (settled.length === 0) return;
+    const settledIds = new Set(settled.map((r) => r.id));
+    for (const row of settled) {
+      if (committedIdsRef.current.has(row.id)) continue;
+      committedIdsRef.current.add(row.id);
+      onCommit?.(row);
+    }
+    setLive((prev) => prev.filter((r) => !settledIds.has(r.id)));
+    setScrollback((prev) => [...prev, ...settled]);
+  }, [live, onCommit]);
+
   const cancel = useCallback(() => abortRef.current?.abort(), []);
 
   // Switch sessions: append loaded rows to scrollback (they print to terminal
@@ -108,7 +129,12 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
       const activeCp = compactionPoint;
       const visibleHistory = activeCp ? messages.filter((r) => r.id > activeCp.afterId) : messages;
       const baseHistory = [...visibleHistory, userMsg];
-      setLive((prev) => [...prev, userMsg, initialAssistant]);
+      // Commit the user row straight to scrollback so Ink's dynamic area only
+      // carries the actively streaming assistant (and any pending tool rows).
+      // This keeps the dynamic block short enough that in-place redraws don't
+      // scroll past the top of the terminal and leak old frames.
+      setScrollback((prev) => [...prev, userMsg]);
+      setLive([initialAssistant]);
       setStreaming(true);
       committedIdsRef.current.add(userMsg.id);
       onCommit?.(userMsg);
