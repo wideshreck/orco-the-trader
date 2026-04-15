@@ -4,11 +4,11 @@ import type { Approver, OrcoTool } from './types.js';
 
 const REGISTRY = new Map<string, OrcoTool<unknown, unknown>>();
 
-export function register(tool: OrcoTool<unknown, unknown>): void {
+export function register<I, O>(tool: OrcoTool<I, O>): void {
   if (REGISTRY.has(tool.name)) {
     throw new Error(`tool already registered: ${tool.name}`);
   }
-  REGISTRY.set(tool.name, tool);
+  REGISTRY.set(tool.name, tool as unknown as OrcoTool<unknown, unknown>);
 }
 
 export function listAll(): OrcoTool<unknown, unknown>[] {
