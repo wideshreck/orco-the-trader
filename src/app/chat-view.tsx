@@ -1,6 +1,7 @@
 import { Box, Text } from 'ink';
 import TextInput from 'ink-text-input';
 import { Banner } from './banner.js';
+import type { SlashCommand } from './commands.js';
 import type { ChatRow } from './use-chat.js';
 
 export type ChatFocus = 'input' | 'tools-bar' | 'tools-panel';
@@ -14,11 +15,15 @@ export function ChatView(props: {
   onSubmit: (v: string) => void;
   focus: ChatFocus;
   exitWarning: boolean;
+  suggestions: SlashCommand[];
+  suggestionIdx: number;
 }) {
-  const { modelLabel, messages, streaming, input, focus, exitWarning } = props;
+  const { modelLabel, messages, streaming, input, focus, exitWarning, suggestions, suggestionIdx } =
+    props;
+  const showSuggestions = focus === 'input' && !streaming && suggestions.length > 0;
   return (
     <Box flexDirection="column" padding={1}>
-      <Box marginBottom={1}>
+      <Box flexDirection="column" marginBottom={1}>
         <Banner
           subtitle={
             <Box>
@@ -48,6 +53,38 @@ export function ChatView(props: {
       </Box>
 
       <Box flexDirection="column">
+        {showSuggestions && (
+          <Box
+            flexDirection="column"
+            borderStyle="round"
+            borderColor="cyan"
+            paddingX={1}
+            marginBottom={0}
+          >
+            {suggestions.map((cmd, i) => {
+              const selected = i === suggestionIdx;
+              return (
+                <Box key={cmd.name}>
+                  <Text
+                    {...(selected ? { color: 'cyan' as const } : {})}
+                    inverse={selected}
+                    bold={selected}
+                  >
+                    {selected ? '▸ ' : '  '}
+                    {cmd.name}
+                  </Text>
+                  <Text dimColor>
+                    {'  '}
+                    {cmd.description}
+                  </Text>
+                </Box>
+              );
+            })}
+            <Box marginTop={1}>
+              <Text dimColor>↑↓ navigate · tab complete · esc clear</Text>
+            </Box>
+          </Box>
+        )}
         <Box
           borderStyle="round"
           borderColor={focus === 'input' && input.length > 0 ? 'cyan' : 'gray'}

@@ -1,6 +1,7 @@
 import { useApp, useInput } from 'ink';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { type ChatFocus, ChatView } from './app/chat-view.js';
+import { matchCommands } from './app/commands.js';
 import { useChat } from './app/use-chat.js';
 import { isAuthenticated } from './auth.js';
 import { type Catalog, findModel, loadCatalog, type ModelRef } from './catalog.js';
@@ -27,7 +28,15 @@ export function App() {
   const [input, setInput] = useState('');
   const [focus, setFocus] = useState<ChatFocus>('input');
   const [exitWarning, setExitWarning] = useState(false);
+  const [suggestionIdx, setSuggestionIdx] = useState(0);
   const warningTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const suggestions = useMemo(() => matchCommands(input), [input]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: input is the trigger
+  useEffect(() => {
+    setSuggestionIdx(0);
+  }, [input]);
 
   const provider = catalog && config.providerId ? catalog[config.providerId] : undefined;
   const target =
@@ -85,6 +94,25 @@ export function App() {
       return;
     }
     if (phase.kind !== 'chat') return;
+    if (focus === 'input' && suggestions.length > 0) {
+      if (key.upArrow) {
+        setSuggestionIdx((i) => Math.max(0, i - 1));
+        return;
+      }
+      if (key.downArrow) {
+        setSuggestionIdx((i) => Math.min(suggestions.length - 1, i + 1));
+        return;
+      }
+      if (key.tab) {
+        const pick = suggestions[suggestionIdx];
+        if (pick) setInput(pick.name);
+        return;
+      }
+      if (key.escape) {
+        setInput('');
+        return;
+      }
+    }
     if (focus === 'input' && key.downArrow) {
       setFocus('tools-bar');
       return;
@@ -181,6 +209,8 @@ export function App() {
       onSubmit={handleSubmit}
       focus={focus}
       exitWarning={exitWarning}
+      suggestions={suggestions}
+      suggestionIdx={suggestionIdx}
     />
   );
 }
