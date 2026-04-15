@@ -144,7 +144,7 @@ export function App() {
       setInput('');
       return;
     }
-    if (trimmed === '/exit' || trimmed === '/quit') {
+    if (trimmed === '/exit') {
       exit();
       return;
     }

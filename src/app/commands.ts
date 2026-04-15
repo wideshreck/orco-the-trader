@@ -7,7 +7,6 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
   { name: '/model', description: 'select model' },
   { name: '/clear', description: 'clear chat history' },
   { name: '/exit', description: 'exit orco' },
-  { name: '/quit', description: 'exit orco' },
 ] as const;
 
 export function matchCommands(input: string): SlashCommand[] {
