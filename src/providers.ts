@@ -35,8 +35,7 @@ const FACTORIES: Record<string, () => Promise<ProviderFactory>> = {
   },
   ollama: async () => {
     const { createOllama } = await import('ollama-ai-provider-v2');
-    return ({ baseURL }) =>
-      createOllama({ baseURL: baseURL ?? 'http://localhost:11434/api' });
+    return ({ baseURL }) => createOllama({ baseURL: baseURL ?? 'http://localhost:11434/api' });
   },
 };
 

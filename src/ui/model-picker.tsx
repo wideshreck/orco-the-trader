@@ -48,9 +48,7 @@ export function ModelPicker(props: {
     }
     out.sort((a, b) => {
       if (a.authed !== b.authed) return a.authed ? -1 : 1;
-      return `${a.provider.id}/${a.model.id}`.localeCompare(
-        `${b.provider.id}/${b.model.id}`,
-      );
+      return `${a.provider.id}/${a.model.id}`.localeCompare(`${b.provider.id}/${b.model.id}`);
     });
     return out;
   }, [props.catalog]);
@@ -96,10 +94,7 @@ export function ModelPicker(props: {
     if (key.return) {
       const r = filtered[safeCursor];
       if (!r) return;
-      props.onPick(
-        { providerId: r.provider.id, modelId: r.model.id },
-        r.authed,
-      );
+      props.onPick({ providerId: r.provider.id, modelId: r.model.id }, r.authed);
       return;
     }
   });

@@ -52,8 +52,7 @@ export function App() {
             : null;
         const currentModel = currentRef ? findModel(catalog, currentRef) : undefined;
         const currentProvider = currentRef ? catalog[currentRef.providerId] : undefined;
-        const authed =
-          currentProvider && isAuthenticated(currentProvider.id, currentProvider.env);
+        const authed = currentProvider && isAuthenticated(currentProvider.id, currentProvider.env);
         if (currentModel && authed) {
           setPhase({ kind: 'chat' });
         } else {
@@ -174,9 +173,7 @@ export function App() {
       }
     } catch (err: any) {
       const msg =
-        err?.name === 'AbortError'
-          ? '(iptal edildi)'
-          : `Hata: ${err?.message ?? String(err)}`;
+        err?.name === 'AbortError' ? '(iptal edildi)' : `Hata: ${err?.message ?? String(err)}`;
       setMessages((prev) => {
         const copy = [...prev];
         copy[copy.length - 1] = {
@@ -245,9 +242,7 @@ export function App() {
 
   const currentProvider = catalog[config.providerId];
   const currentModel = currentProvider?.models[config.modelId];
-  const label = currentModel
-    ? `${config.providerId}/${currentModel.id}`
-    : 'model seçilmedi';
+  const label = currentModel ? `${config.providerId}/${currentModel.id}` : 'model seçilmedi';
 
   return (
     <Box flexDirection="column" padding={1}>
@@ -260,12 +255,24 @@ export function App() {
         paddingY={1}
         marginBottom={1}
       >
-        <Text color="cyan" bold>{'     ██╗ █████╗ ██████╗ ██╗   ██╗██╗███████╗'}</Text>
-        <Text color="cyan" bold>{'     ██║██╔══██╗██╔══██╗██║   ██║██║██╔════╝'}</Text>
-        <Text color="cyan" bold>{'     ██║███████║██████╔╝██║   ██║██║███████╗'}</Text>
-        <Text color="cyan" bold>{'██   ██║██╔══██║██╔══██╗╚██╗ ██╔╝██║╚════██║'}</Text>
-        <Text color="cyan" bold>{'╚█████╔╝██║  ██║██║  ██║ ╚████╔╝ ██║███████║'}</Text>
-        <Text color="cyan" bold>{' ╚════╝ ╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚═╝╚══════╝'}</Text>
+        <Text color="cyan" bold>
+          {'     ██╗ █████╗ ██████╗ ██╗   ██╗██╗███████╗'}
+        </Text>
+        <Text color="cyan" bold>
+          {'     ██║██╔══██╗██╔══██╗██║   ██║██║██╔════╝'}
+        </Text>
+        <Text color="cyan" bold>
+          {'     ██║███████║██████╔╝██║   ██║██║███████╗'}
+        </Text>
+        <Text color="cyan" bold>
+          {'██   ██║██╔══██║██╔══██╗╚██╗ ██╔╝██║╚════██║'}
+        </Text>
+        <Text color="cyan" bold>
+          {'╚█████╔╝██║  ██║██║  ██║ ╚████╔╝ ██║███████║'}
+        </Text>
+        <Text color="cyan" bold>
+          {' ╚════╝ ╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚═╝╚══════╝'}
+        </Text>
         <Box marginTop={1}>
           <Text dimColor>The Trader v0.1 · </Text>
           <Text color="magenta">{label}</Text>
@@ -274,9 +281,7 @@ export function App() {
 
       <Box flexDirection="column" marginBottom={1}>
         {messages.length === 0 && (
-          <Text dimColor>
-            Mesaj yaz ve enter'a bas · /model model seç · /clear geçmişi temizle
-          </Text>
+          <Text dimColor>Mesaj yaz ve enter'a bas · /model model seç · /clear geçmişi temizle</Text>
         )}
         {messages.map((msg, i) => (
           <Box key={i} flexDirection="column" marginBottom={1}>

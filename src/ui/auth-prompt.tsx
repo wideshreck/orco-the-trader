@@ -29,13 +29,7 @@ export function AuthPrompt(props: {
   const masked = '•'.repeat(Math.min(key.length, 40));
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="yellow"
-      paddingX={1}
-      paddingY={1}
-    >
+    <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={1} paddingY={1}>
       <Text color="yellow" bold>
         {props.provider.name} api key gerekli
       </Text>

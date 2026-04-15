@@ -49,10 +49,7 @@ export function getAllAuth(): AuthStore {
   return readStore();
 }
 
-export function getApiKey(
-  providerId: string,
-  envKeys: string[],
-): string | undefined {
+export function getApiKey(providerId: string, envKeys: string[]): string | undefined {
   for (const env of envKeys) {
     const v = process.env[env];
     if (v) return v;
