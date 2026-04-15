@@ -13,6 +13,7 @@ export type InfoPanel = { title: string; lines: string[] };
 
 export function ChatView(props: {
   modelLabel: string;
+  sessionLabel: string;
   messages: ChatRow[];
   streaming: boolean;
   input: string;
@@ -27,6 +28,7 @@ export function ChatView(props: {
 }) {
   const {
     modelLabel,
+    sessionLabel,
     messages,
     streaming,
     input,
@@ -47,6 +49,8 @@ export function ChatView(props: {
             <Box>
               <Text dimColor>The Trader v0.1 · </Text>
               <Text color="magenta">{modelLabel}</Text>
+              <Text dimColor> · </Text>
+              <Text color="cyan">{truncateLabel(sessionLabel)}</Text>
             </Box>
           }
         />
@@ -205,4 +209,9 @@ export function ChatView(props: {
       </Box>
     </Box>
   );
+}
+
+function truncateLabel(s: string): string {
+  if (s.length <= 30) return s;
+  return `${s.slice(0, 29)}…`;
 }

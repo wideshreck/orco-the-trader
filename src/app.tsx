@@ -1,23 +1,20 @@
 import { useApp, useInput } from 'ink';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { type ChatFocus, ChatView, type InfoPanel } from './app/chat-view.js';
-import { isKnownCommand, matchCommands, SLASH_COMMANDS } from './app/commands.js';
+import { matchCommands } from './app/commands.js';
+import { dispatchCommand, type Phase } from './app/dispatch.js';
 import { useApproval } from './app/use-approval.js';
 import { useChat } from './app/use-chat.js';
+import { useSession } from './app/use-session.js';
 import { isAuthenticated } from './auth.js';
 import { type Catalog, findModel, loadCatalog, type ModelRef } from './catalog.js';
 import { type Config, loadConfig, saveConfig } from './config.js';
 import { errorMessage } from './errors.js';
-import { listActive, listAlwaysAllowed, setAlwaysAllowed } from './tools/index.js';
+import { setAlwaysAllowed } from './tools/index.js';
 import { AuthPrompt } from './ui/auth-prompt.js';
 import { Bootstrap } from './ui/bootstrap.js';
 import { ModelPicker } from './ui/model-picker.js';
-
-type Phase =
-  | { kind: 'bootstrap'; status: string; error?: string | null }
-  | { kind: 'picker' }
-  | { kind: 'auth'; providerId: string }
-  | { kind: 'chat' };
+import { SessionPicker } from './ui/session-picker.js';
 
 export function App() {
   const { exit } = useApp();
@@ -53,7 +50,16 @@ export function App() {
       : null;
 
   const approval = useApproval();
-  const chat = useChat(target, approval.approver);
+  const session = useSession();
+  const chat = useChat(target, approval.approver, {
+    seedRows: session.initialRows,
+    onCommit: (row) => {
+      session.recordRow(
+        row,
+        target ? { providerId: target.ref.providerId, modelId: target.ref.modelId } : undefined,
+      );
+    },
+  });
 
   // Safety: if stream ends with an unresolved approval (e.g. user aborted), deny it.
   useEffect(() => {
@@ -167,52 +173,22 @@ export function App() {
   const handleSubmit = (value: string) => {
     let trimmed = value.trim();
     if (!trimmed) return;
-    // If the autocomplete dropdown is open, Enter executes the highlighted suggestion
-    // even if the user typed a partial/ambiguous prefix (e.g. "/tool" → "/tools").
     if (trimmed.startsWith('/') && suggestions.length > 0) {
       const pick = suggestions[suggestionIdx];
       if (pick) trimmed = pick.name;
     }
-    if (trimmed === '/model') {
-      setInput('');
-      setPhase({ kind: 'picker' });
-      return;
-    }
-    if (trimmed === '/clear') {
-      chat.clear();
-      setInput('');
-      return;
-    }
-    if (trimmed === '/tools') {
-      setInput('');
-      const allowed = new Set(listAlwaysAllowed());
-      const lines = listActive().map((t) => {
-        const tier = t.permission === 'auto' || allowed.has(t.name) ? 'auto' : 'ask';
-        return `  ${t.name.padEnd(12)} [${tier}]  ${t.description}`;
-      });
-      setInfoPanel({ title: 'tools', lines: lines.length ? lines : ['  (none registered)'] });
-      return;
-    }
-    if (trimmed === '/help') {
-      setInput('');
-      const lines = SLASH_COMMANDS.map((c) => `  ${c.name.padEnd(8)}  ${c.description}`);
-      setInfoPanel({ title: 'commands', lines });
-      return;
-    }
-    if (trimmed === '/exit') {
-      exit();
-      return;
-    }
-    if (trimmed.startsWith('/') && !isKnownCommand(trimmed)) {
-      setInput('');
-      setInfoPanel({
-        title: 'unknown command',
-        lines: [`  ${trimmed} is not a recognized command`, '  type /help to see all commands'],
-      });
-      return;
-    }
+    const result = dispatchCommand(trimmed, {
+      setPhase,
+      setInfoPanel,
+      exit,
+      clearChat: () => {
+        if (chat.streaming) chat.cancel();
+        session.startNew();
+        chat.reset([]);
+      },
+    });
     setInput('');
-    void chat.send(trimmed);
+    if (result === 'send') void chat.send(trimmed);
   };
 
   if (phase.kind === 'bootstrap') {
@@ -256,15 +232,38 @@ export function App() {
     );
   }
 
-  if (!catalog || !target) {
+  if (phase.kind === 'sessions') {
+    return (
+      <SessionPicker
+        sessions={session.list()}
+        currentId={session.currentId}
+        onCancel={() => setPhase({ kind: 'chat' })}
+        onPick={(id) => {
+          const rows = session.switchTo(id);
+          chat.reset(rows);
+          setPhase({ kind: 'chat' });
+        }}
+        onDelete={(id) => {
+          session.remove(id);
+        }}
+      />
+    );
+  }
+
+  if (!catalog || !target || !session.ready) {
     return <Bootstrap status="..." />;
   }
 
   const modelLabel = `${target.ref.providerId}/${target.ref.modelId}`;
+  const sessionMeta = session.currentId
+    ? session.list().find((s) => s.id === session.currentId)
+    : undefined;
+  const sessionLabel = sessionMeta ? sessionMeta.title : 'new session';
 
   return (
     <ChatView
       modelLabel={modelLabel}
+      sessionLabel={sessionLabel}
       messages={chat.messages}
       streaming={chat.streaming}
       input={input}
