@@ -270,11 +270,16 @@ function ChatRowView(props: {
 }) {
   const { row, placeholder = '', formatUsage } = props;
   if (row.kind === 'tool') return <ToolCallView row={row} />;
+  const isUser = row.kind === 'user';
+  const badgeColor = isUser ? 'green' : 'magenta';
+  const badgeLabel = isUser ? ' you ' : ' orco ';
   return (
     <Box flexDirection="column" marginBottom={1}>
-      <Text color={row.kind === 'user' ? 'green' : 'magenta'} bold>
-        {row.kind === 'user' ? '› you' : '‹ orco'}
-      </Text>
+      <Box marginBottom={1}>
+        <Text color={badgeColor} inverse bold>
+          {badgeLabel}
+        </Text>
+      </Box>
       {row.kind === 'assistant' && row.error ? (
         <Text color="red">{row.content}</Text>
       ) : row.kind === 'assistant' ? (
@@ -282,7 +287,11 @@ function ChatRowView(props: {
       ) : (
         <Text>{row.content}</Text>
       )}
-      {row.kind === 'assistant' && row.usage && <Text dimColor>{formatUsage(row.usage)}</Text>}
+      {row.kind === 'assistant' && row.usage && (
+        <Box marginTop={1}>
+          <Text dimColor>{formatUsage(row.usage)}</Text>
+        </Box>
+      )}
     </Box>
   );
 }
