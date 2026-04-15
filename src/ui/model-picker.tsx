@@ -1,6 +1,6 @@
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { isAuthenticated } from '../auth.js';
 import type { Catalog, CatalogModel, CatalogProvider, ModelRef } from '../catalog.js';
 import { isSupportedProvider } from '../providers.js';
@@ -36,6 +36,11 @@ export function ModelPicker(props: {
 }) {
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState(0);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: query is the trigger, not a body dep
+  useEffect(() => {
+    setCursor(0);
+  }, [query]);
 
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
