@@ -5,6 +5,8 @@ export type SlashCommand = {
 
 export const SLASH_COMMANDS: readonly SlashCommand[] = [
   { name: '/clear', description: 'start a new session (alias of /new)' },
+  { name: '/compact', description: 'summarize older messages to free context' },
+  { name: '/cost', description: 'show token usage and cost breakdown' },
   { name: '/exit', description: 'exit orco' },
   { name: '/help', description: 'show all commands' },
   { name: '/model', description: 'select model' },

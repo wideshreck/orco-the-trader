@@ -119,12 +119,19 @@ export function chatRowsToModelMessages(rows: ChatRow[]): ModelMessage[] {
       flushAssistant();
       out.push({ role: 'user', content: row.content });
     } else if (row.kind === 'assistant') {
+      // Tool results close the previous assistant's tool-use turn; a new
+      // assistant row starts a fresh message.
       flushTool();
-      if (!assistantBuf) assistantBuf = { text: '', toolCalls: [] };
-      if (row.content) assistantBuf.text += assistantBuf.text ? `\n${row.content}` : row.content;
+      flushAssistant();
+      assistantBuf = { text: '', toolCalls: [] };
+      if (row.content) assistantBuf.text = row.content;
     } else {
+      // Tool row: the preceding assistant declared this call. Attach the call
+      // to that assistant, flush it, then buffer the result for the tool
+      // message that follows.
       if (!assistantBuf) assistantBuf = { text: '', toolCalls: [] };
       assistantBuf.toolCalls.push({ id: row.toolCallId, name: row.name, input: row.input });
+      flushAssistant();
       const result =
         row.status === 'denied' || row.status === 'error'
           ? { error: row.error ?? 'tool failed' }
