@@ -1,25 +1,27 @@
 import { Box, Text } from 'ink';
 import type { ToolRow } from './use-chat.js';
 
-const INPUT_PREVIEW = 70;
-const OUTPUT_PREVIEW = 140;
-
 export function ToolCallView(props: { row: ToolRow }) {
   const { row } = props;
   const icon = iconFor(row.status);
   const color = colorFor(row.status);
-  const inputPreview = preview(row.input, INPUT_PREVIEW);
+  const inputSummary = summarizeInput(row.input);
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Box>
         <Text color={color} bold>
           {icon} {row.name}
         </Text>
-        {inputPreview && <Text dimColor> {inputPreview}</Text>}
+        {inputSummary && (
+          <Text dimColor>
+            {'  '}
+            {inputSummary}
+          </Text>
+        )}
       </Box>
       {row.status === 'done' && row.output !== undefined && (
         <Box paddingLeft={2}>
-          <Text dimColor>→ {preview(row.output, OUTPUT_PREVIEW)}</Text>
+          <Text dimColor>→ {summarizeOutput(row.output)}</Text>
         </Box>
       )}
       {(row.status === 'error' || row.status === 'denied') && row.error && (
@@ -70,18 +72,83 @@ function colorFor(status: ToolRow['status']): 'cyan' | 'green' | 'red' | 'yellow
   }
 }
 
-/** Single-line preview of a JSON-ish value. Collapses whitespace and shows
- * just the first/last few chars of any long array so the row always fits one
- * visual line regardless of terminal width. */
-function preview(value: unknown, limit: number): string {
-  if (value === null || value === undefined) return '';
+const MAX_INPUT = 80;
+const MAX_OUTPUT = 80;
+
+/** One-line human summary of tool input. Renders small objects as
+ * `key=value · key=value`; falls back to truncated JSON for exotic shapes. */
+function summarizeInput(input: unknown): string {
+  if (input === null || input === undefined) return '';
+  if (typeof input !== 'object' || Array.isArray(input)) {
+    return clip(stringify(input), MAX_INPUT);
+  }
+  const entries = Object.entries(input as Record<string, unknown>);
+  if (entries.length === 0) return '';
+  const parts = entries.slice(0, 4).map(([k, v]) => `${k}=${scalar(v)}`);
+  const tail = entries.length > 4 ? ` · +${entries.length - 4} more` : '';
+  return clip(parts.join(' · ') + tail, MAX_INPUT);
+}
+
+/** One-line summary of tool output. Prefers array counts, falls back to a
+ * short key=value preview. Never dumps raw JSON. */
+function summarizeOutput(output: unknown): string {
+  if (output === null || output === undefined) return 'ok';
+  if (Array.isArray(output)) return `${output.length} items`;
+  if (typeof output !== 'object') return clip(stringify(output), MAX_OUTPUT);
+  const obj = output as Record<string, unknown>;
+  // If there's a `count` or array field, lead with that — most informative.
+  if (typeof obj.count === 'number') {
+    const extra = summarizeSiblings(obj, ['count']);
+    return extra ? `${obj.count} · ${extra}` : `${obj.count}`;
+  }
+  for (const [k, v] of Object.entries(obj)) {
+    if (Array.isArray(v)) {
+      const extra = summarizeSiblings(obj, [k]);
+      return extra ? `${v.length} ${k} · ${extra}` : `${v.length} ${k}`;
+    }
+  }
+  // No obvious aggregate — summarize top fields.
+  const entries = Object.entries(obj).slice(0, 3);
+  const parts = entries.map(([k, v]) => `${k}=${scalar(v)}`);
+  return clip(parts.join(' · '), MAX_OUTPUT);
+}
+
+function summarizeSiblings(obj: Record<string, unknown>, skip: string[]): string {
+  const out: string[] = [];
+  for (const [k, v] of Object.entries(obj)) {
+    if (skip.includes(k)) continue;
+    if (Array.isArray(v) || (v !== null && typeof v === 'object')) continue;
+    out.push(`${k}=${scalar(v)}`);
+    if (out.length >= 2) break;
+  }
+  return out.join(' · ');
+}
+
+function scalar(v: unknown): string {
+  if (v === null || v === undefined) return 'null';
+  if (typeof v === 'string') return v.length > 24 ? `${v.slice(0, 24)}…` : v;
+  if (typeof v === 'number') {
+    // Keep reasonable precision for price-like numbers.
+    if (Number.isInteger(v)) return String(v);
+    if (Math.abs(v) > 1000) return v.toFixed(2);
+    if (Math.abs(v) > 1) return v.toFixed(4);
+    return v.toPrecision(4);
+  }
+  if (typeof v === 'boolean') return String(v);
+  if (Array.isArray(v)) return `[${v.length}]`;
+  if (typeof v === 'object') return '{…}';
+  return String(v);
+}
+
+function stringify(value: unknown): string {
   try {
-    const s = typeof value === 'string' ? value : JSON.stringify(value, null, 0);
-    if (!s) return '';
-    const oneLine = s.replace(/\s+/g, ' ');
-    if (oneLine.length <= limit) return oneLine;
-    return `${oneLine.slice(0, limit)}… +${oneLine.length - limit}`;
+    return typeof value === 'string' ? value : JSON.stringify(value);
   } catch {
     return String(value);
   }
+}
+
+function clip(s: string, limit: number): string {
+  const oneLine = s.replace(/\s+/g, ' ');
+  return oneLine.length > limit ? `${oneLine.slice(0, limit)}…` : oneLine;
 }
