@@ -32,6 +32,10 @@ export function App() {
   const [suggestionIdx, setSuggestionIdx] = useState(0);
   const [suggestionsDismissedFor, setSuggestionsDismissedFor] = useState<string | null>(null);
   const [infoPanel, setInfoPanel] = useState<InfoPanel | null>(null);
+  // Up/down arrow cycles through previously-sent user messages when the input
+  // is focused and the suggestion dropdown is not open.
+  const historyIdxRef = useRef<number | null>(null);
+  const draftRef = useRef<string>('');
   const warningTimer = useRef<NodeJS.Timeout | null>(null);
 
   const rawSuggestions = useMemo(() => matchCommands(input), [input]);
@@ -164,8 +168,36 @@ export function App() {
         return;
       }
     }
-    if (focus === 'input' && key.downArrow) {
-      setFocus('tools-bar');
+    if (focus === 'input' && (key.upArrow || key.downArrow)) {
+      const history = chat.messages
+        .filter((m): m is { id: number; kind: 'user'; content: string } => m.kind === 'user')
+        .map((m) => m.content);
+      if (key.upArrow) {
+        if (history.length === 0) return;
+        if (historyIdxRef.current === null) {
+          historyIdxRef.current = 0;
+          draftRef.current = input;
+        } else if (historyIdxRef.current < history.length - 1) {
+          historyIdxRef.current += 1;
+        } else {
+          return;
+        }
+        setInput(history[history.length - 1 - historyIdxRef.current] ?? '');
+        return;
+      }
+      // down arrow
+      if (historyIdxRef.current === null) {
+        setFocus('tools-bar');
+        return;
+      }
+      if (historyIdxRef.current > 0) {
+        historyIdxRef.current -= 1;
+        setInput(history[history.length - 1 - historyIdxRef.current] ?? '');
+      } else {
+        historyIdxRef.current = null;
+        setInput(draftRef.current);
+        draftRef.current = '';
+      }
       return;
     }
     if (focus === 'tools-bar') {
@@ -183,6 +215,9 @@ export function App() {
   }, []);
 
   const handleSubmit = (value: string) => {
+    // A new submission closes any in-progress history browsing.
+    historyIdxRef.current = null;
+    draftRef.current = '';
     let trimmed = value.trim();
     if (!trimmed) return;
     if (trimmed.startsWith('/') && suggestions.length > 0) {
