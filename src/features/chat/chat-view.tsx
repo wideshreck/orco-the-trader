@@ -79,10 +79,14 @@ export function ChatView(props: {
       {/* Static prints each row exactly once and commits it to terminal scrollback.
           Past turns scroll up out of the dynamic area so native terminal scroll works. */}
       <Static items={visibleScrollback}>
-        {(row) => <ChatRowView key={row.id} row={row} formatUsage={props.formatUsage} />}
+        {(row) => (
+          <Box key={row.id} paddingX={2}>
+            <ChatRowView row={row} formatUsage={props.formatUsage} />
+          </Box>
+        )}
       </Static>
 
-      <Box flexDirection="column" paddingX={1}>
+      <Box flexDirection="column" paddingX={2}>
         <Box flexDirection="column" marginBottom={live.length > 0 ? 1 : 0}>
           {live.length === 0 && scrollback.length === 0 && (
             <Text dimColor>type a message and press enter · /help for commands</Text>
