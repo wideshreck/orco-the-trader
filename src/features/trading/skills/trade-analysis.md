@@ -26,7 +26,17 @@ When the user wants a strong signal ("is this a good entry", "swing setup on X")
 
 Use the `alignment.aligned` boolean (≥75% of TFs agree on direction) as a gate: trade setups in the direction of alignment have meaningfully higher odds. If alignment is false, say the TFs disagree and either drop the trade or pick the higher-TF bias.
 
-## 2. Fetch data
+## 2. Fast path — `full_analysis`
+
+When the question is "read this symbol" / "how's X looking" / "swing setup on Y", prefer `full_analysis`. It runs ohlcv + ticker + multi-TF + indicators + S/R + divergence (+ funding + order book + macro) in parallel and returns a structured digest. One call replaces 6–8 sequential tool calls.
+
+Use the targeted tools below when the user asks something focused (just price, just RSI, just a level) or when `full_analysis` returned null for the slice you need.
+
+## 2b. Validate before publishing
+
+Before sending a trade plan to the user, run `validate_trade_plan` on your chosen entry / stop / takeProfit (and pass the current price + ATR if you have them). It catches wrong-side stops, sub-minRR setups, ATR-misaligned stops, and chasing entries. If verdict is `invalid`, fix the plan before replying. If `warnings`, surface the warning in your reply.
+
+## 3. Fetch data
 
 Call `get_ohlcv` with a Binance spot pair (BTCUSDT, ETHUSDT, etc.). Pick the interval by horizon:
 
@@ -45,7 +55,7 @@ For a full market read also call:
 - `get_order_book` (limit 50 or 100) when the user asks about short-term direction or a scalp entry. Read `imbalance` (>0.6 bullish pressure, <0.4 bearish), `spreadPct` (>0.1% = thin book), and any visible walls in top levels.
 - `get_funding_rate` when the symbol has a perp and the horizon is intraday / swing. |rate| > 0.05% is extreme — contrarian bias. Skip for low-cap spot-only pairs.
 
-## 3. Compute indicators
+## 4. Compute indicators
 
 Always use `compute_indicators` — never estimate these by reading candles. Recommended default set:
 
@@ -62,7 +72,7 @@ Optional add-ons when the read calls for it:
 - `adx14` — trend **strength**. <20 = chop (skip trend-following), 20–25 = developing, >25 = strong trend. Pair direction with `plusDI` vs `minusDI`.
 - `vwap` — price above/below anchored VWAP as a simple bias filter on intraday timeframes.
 
-## 4. Read the tape
+## 5. Read the tape
 
 Summarize the structure in this exact order (keeps the output scannable):
 
@@ -74,7 +84,7 @@ Summarize the structure in this exact order (keeps the output scannable):
 6. **Order flow** (if fetched) — bid/ask imbalance, spread, nearby walls.
 7. **Funding** (if fetched) — rate + pct. Extreme readings flip the bias toward a fade.
 
-## 5. Recommendation (if user asked for a trade)
+## 6. Recommendation (if user asked for a trade)
 
 Always include:
 
@@ -87,7 +97,7 @@ Always include:
 If the user mentioned risk tolerance or account size, translate the stop distance into position size:
 `size = risk_usd / stop_distance`.
 
-## 5b. Backtest (when user asks "does this work" / "what's the historical edge")
+## 6b. Backtest (when user asks "does this work" / "what's the historical edge")
 
 When the user asks whether a strategy has worked, or wants stats before committing to a setup, use `backtest`. It runs an event-driven simulation (no look-ahead) with fees + slippage and returns full metrics.
 
@@ -101,7 +111,7 @@ When the user asks whether a strategy has worked, or wants stats before committi
 - Never call a backtest "profitable" based on ≤ 10 trades. Say so explicitly.
 - Results are a single historical path — flag overfitting risk when the parameters are heavily tuned.
 
-## 6. Disclose
+## 7. Disclose
 
 End every recommendation with the literal line:
 

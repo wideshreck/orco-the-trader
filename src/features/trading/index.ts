@@ -2,6 +2,7 @@ import { register } from '../tools/registry.js';
 import { computeIndicators } from './tools/compute-indicators.js';
 import { detectDivergence } from './tools/detect-divergence.js';
 import { detectSupportResistance } from './tools/detect-sr.js';
+import { fullAnalysis } from './tools/full-analysis.js';
 import { getFundingRate } from './tools/get-funding-rate.js';
 import { getMarketContext } from './tools/get-market-context.js';
 import { getOhlcv } from './tools/get-ohlcv.js';
@@ -12,6 +13,7 @@ import { listTopSymbols } from './tools/list-top-symbols.js';
 import { multiTimeframeAnalysis } from './tools/multi-tf.js';
 import { positionSize } from './tools/position-size.js';
 import { scanMarket } from './tools/scan-market.js';
+import { validateTradePlan } from './tools/validate-trade-plan.js';
 
 let bootstrapped = false;
 
@@ -32,6 +34,8 @@ export function bootstrapTrading(): void {
   register(detectSupportResistance);
   register(positionSize);
   register(detectDivergence);
+  register(fullAnalysis);
+  register(validateTradePlan);
 }
 
 export type { Candle } from './tools/get-ohlcv.js';
