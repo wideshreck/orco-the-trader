@@ -7,13 +7,10 @@
 Ask Orco to analyze a coin, backtest a strategy, or size a position — it calls real functions, shows its work, and never makes up a number.
 
 [![CI](https://github.com/wideshreck/orco-the-trader/actions/workflows/ci.yml/badge.svg)](https://github.com/wideshreck/orco-the-trader/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/orco-the-trader)](https://www.npmjs.com/package/orco-the-trader)
 [![Apache 2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
+[![Bun](https://img.shields.io/badge/bun-%E2%89%A51.3-ffdda1)](https://bun.sh)
+[![Node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/typescript-strict-3178c6)](https://www.typescriptlang.org)
-
-```bash
-npx orco
-```
 
 ### Why not just ask ChatGPT?
 
@@ -33,12 +30,10 @@ npx orco
 ## Quickstart
 
 ```bash
-# one-line install + run
-npx orco
-
-# or clone for development
 git clone https://github.com/wideshreck/orco-the-trader.git
-cd orco-the-trader && bun install && bun dev
+cd orco-the-trader
+bun install
+bun dev
 ```
 
 Set at least one API key:
