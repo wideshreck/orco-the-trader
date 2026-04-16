@@ -38,6 +38,7 @@ export function ChatView(props: {
   onQuestionDraftChange: (v: string) => void;
   onQuestionSubmit: (answer: string) => void;
   todos: Todo[];
+  resizeEpoch: number;
 }) {
   const {
     modelLabel,
@@ -53,7 +54,15 @@ export function ChatView(props: {
     approval,
     infoPanel,
   } = props;
-  const { queue, question, questionDraft, onQuestionDraftChange, onQuestionSubmit, todos } = props;
+  const {
+    queue,
+    question,
+    questionDraft,
+    onQuestionDraftChange,
+    onQuestionSubmit,
+    todos,
+    resizeEpoch,
+  } = props;
   const showSuggestions = focus === 'input' && !streaming && !approval && suggestions.length > 0;
   // Input stays typeable while streaming / awaiting approval: submissions
   // are queued by the parent and drained when the slot clears. Disabled while
@@ -80,7 +89,7 @@ export function ChatView(props: {
           Past turns scroll up out of the dynamic area so native terminal scroll works. */}
       <Static items={visibleScrollback}>
         {(row) => (
-          <Box key={row.id} paddingX={2}>
+          <Box key={`${row.id}-${resizeEpoch}`} paddingX={2}>
             <ChatRowView row={row} formatUsage={props.formatUsage} />
           </Box>
         )}

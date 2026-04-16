@@ -42,6 +42,10 @@ export function App() {
   // FIFO when the stream settles.
   const [queue, setQueue] = useState<string[]>([]);
   const [todos, setTodos] = useState<Todo[]>([]);
+  // Bumped on terminal resize. Changing Static item keys forces Ink to re-emit
+  // all scrollback rows at the new width. Combined with a synchronous screen
+  // clear this rebuilds the entire view cleanly.
+  const [resizeEpoch, setResizeEpoch] = useState(0);
   // Up/down arrow cycles through previously-sent user messages when the input
   // is focused and the suggestion dropdown is not open.
   const historyIdxRef = useRef<number | null>(null);
@@ -55,6 +59,19 @@ export function App() {
   useEffect(() => {
     setSuggestionIdx(0);
   }, [input]);
+
+  useEffect(() => {
+    const onResize = () => {
+      // Clear viewport + scrollback so old wraps vanish, then bump the epoch
+      // so Static re-keys all items and Ink re-emits them at the new width.
+      process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
+      setResizeEpoch((e) => e + 1);
+    };
+    process.stdout.prependListener('resize', onResize);
+    return () => {
+      process.stdout.removeListener('resize', onResize);
+    };
+  }, []);
 
   const provider = catalog && config.providerId ? catalog[config.providerId] : undefined;
   const target =
@@ -484,6 +501,7 @@ export function App() {
       onQuestionDraftChange={setQuestionDraft}
       onQuestionSubmit={(ans) => question.resolve(ans)}
       todos={todos}
+      resizeEpoch={resizeEpoch}
     />
   );
 }
