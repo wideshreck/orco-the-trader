@@ -60,7 +60,7 @@ Orco picks up your language — English, Turkish, or anything in between.
 - Message queue while streaming, multi-line input (`Shift+Enter` or trailing `\`)
 - Up/down input history, session persistence (JSONL), session picker, auto-resume
 - Manual `/compact` + auto-compact at 90% context
-- Skills (Claude-Code compatible, `~/.config/orco/skills/`)
+- 7 built-in skills (trade analysis, breakout, mean-reversion, divergence hunt, risk-first sizing, common mistakes, post-trade review) + user-installable (Claude-Code compatible, `~/.config/orco/skills/`)
 - Native tool framework with `auto / ask / deny` permissions and always-allowed store
 - Model Context Protocol (HTTP + STDIO) — MCP tools ride the same approval flow
 
@@ -81,9 +81,10 @@ Orco picks up your language — English, Turkish, or anything in between.
 - ATR-based risk sizing, optional chandelier trailing stop
 - Realistic fee + slippage modeling
 - Full metrics: total return, CAGR, Sharpe, Sortino, max drawdown + duration, profit factor, expectancy, payoff ratio, average R multiple, win rate, exposure %, buy-and-hold benchmark
+- Parameter sweep: grid-search 1–4 params, top-30 by Sharpe + best by return / PF, <5-trade rows auto-excluded
 
 **Quality**
-- 200+ unit tests with `bun:test`
+- 206 unit tests with `bun:test`
 - Strict TypeScript, Biome lint + format, CI on every push
 - Feature-first architecture; each file stays under ~300 lines
 
@@ -110,6 +111,7 @@ Orco picks up your language — English, Turkish, or anything in between.
 | `detect_divergence` | Two-point RSI / MACD divergence scan |
 | `position_size` | Risk-based qty sizing with optional take-profit and leverage |
 | `backtest` | Event-driven simulation with 4 presets and full metrics |
+| `sweep_backtest` | Grid-search parameter sweep: 1–4 ranges, top-30 by Sharpe + best by return/PF |
 | `watchlist` | Persistent symbol list (list / add / remove / clear) |
 | `ask_user` | LLM pauses to ask the user a scoped question |
 | `todo_write` | LLM-managed task list rendered live in the chat |
@@ -182,7 +184,19 @@ description: When to use — short trigger the LLM reads to decide relevance
 Detailed playbook: tools to call, thresholds to check, output shape.
 ```
 
-Place the file at `~/.config/orco/skills/my_strategy/SKILL.md` (or `.../my_strategy.md`). Orco ships with a built-in `trade_analysis` skill that wires the full workflow — clarify → multi-symbol filter → multi-TF confluence → fast-path digest → validate → compute → read tape → recommend → disclose.
+Place the file at `~/.config/orco/skills/my_strategy/SKILL.md` (or `.../my_strategy.md`).
+
+Orco ships with 7 built-in skills:
+
+| Skill | Trigger |
+|---|---|
+| `trade_analysis` | General-purpose TA workflow (clarify → multi-TF → digest → validate → recommend → disclose) |
+| `breakout_setup` | "Is it breaking out?", range breaks, channel exits |
+| `mean_reversion_setup` | Oversold/overbought bounces, dip buying, band fades |
+| `divergence_hunt` | RSI/MACD divergence scan and validation |
+| `risk_first` | Position sizing, "how much should I buy?" |
+| `common_mistakes` | Background awareness: no-stop, chasing, revenge trading, size creep |
+| `post_trade_review` | "I got stopped out" — structured debrief with tape reconstruction |
 
 ---
 
@@ -227,6 +241,14 @@ Defaults: $10 000 balance, 1% risk per trade, ATR(14) × 1.5 stop, 2R take-profi
 
 Returns a trade log, downsampled equity curve, and the full metric block. Results shorter than ~30 trades are flagged as small-sample by the skill.
 
+### Parameter sweep
+
+```
+> sweep RSI oversold from 20 to 40 step 5 on BTCUSDT 4h, last 500 bars
+```
+
+Grid-searches 1–4 parameter ranges, runs a backtest per combination (max 500), and returns the top-30 sorted by Sharpe plus the single best row by total return and by profit factor. Rows with fewer than 5 trades are auto-excluded from the winners to resist curve-fitting. Always caveat: in-sample optimization overfits.
+
 ---
 
 ## Development
@@ -267,8 +289,9 @@ See [`CLAUDE.md`](./CLAUDE.md) for the contributor style guide (kept intentional
 
 ## Roadmap
 
-- [ ] Specialized skills: `risk_first`, `breakout_setup`, `mean_reversion_setup`, `divergence_hunt`, `post_trade_review`, `common_mistakes`
-- [ ] Walk-forward and parameter-sweep backtests
+- [x] Specialized skills (breakout, mean-reversion, divergence, risk-first, mistakes, post-trade review)
+- [x] Parameter-sweep backtests
+- [ ] Walk-forward (IS/OOS) backtest split
 - [ ] Background alert watcher (price / indicator triggers with notification)
 - [ ] Paper trading (simulated positions, persistent PnL)
 - [ ] Live execution (exchange API integration behind hard safety gates)
