@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { defineTool } from '../../tools/define.js';
 
-const DEPTH_LIMITS = [5, 10, 20, 50, 100, 500, 1000] as const;
+const DEPTH_LIMITS: readonly number[] = [5, 10, 20, 50, 100, 500, 1000];
 
 type RawLevel = [string, string];
 type Raw = { lastUpdateId: number; bids: RawLevel[]; asks: RawLevel[] };
@@ -42,17 +42,10 @@ export const getOrderBook = defineTool({
   inputSchema: z.object({
     symbol: z.string().describe('Binance spot pair, uppercase'),
     limit: z
-      .union([
-        z.literal(5),
-        z.literal(10),
-        z.literal(20),
-        z.literal(50),
-        z.literal(100),
-        z.literal(500),
-        z.literal(1000),
-      ])
+      .number()
+      .int()
       .optional()
-      .describe('Depth levels per side (default 20)'),
+      .describe('Depth levels per side. Allowed: 5, 10, 20, 50, 100, 500, 1000. Default 20'),
   }),
   async execute(input, ctx) {
     const symbol = input.symbol.toUpperCase();
