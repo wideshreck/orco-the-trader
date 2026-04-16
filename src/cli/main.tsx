@@ -61,12 +61,15 @@ const app = render(
 );
 
 // Resize handling. We render directly to scrollback (no alt-screen) so native
-// up-scroll works. On SIGWINCH Ink's previous dynamic frame mis-wraps relative
-// to the new width; calling app.clear() erases JUST Ink's tracked output
-// region, not the terminal scrollback above it. Ink's own reconciler then
-// redraws in place at the new width on the next tick.
-process.stdout.on('resize', () => {
-  app.clear();
+// scroll works. On SIGWINCH the previous dynamic frame mis-wraps at the new
+// width and Ink's eraseLines() uses a row count measured at the OLD width, so
+// residue stacks. Textual uses the same trick for its inline driver: clear
+// the VISIBLE viewport only (\x1b[2J) — scrollback above is preserved (that
+// needs \x1b[3J which we deliberately omit), so past messages remain reachable
+// via the terminal's own scroll. prependListener puts our handler before
+// Ink's internal resize listener, so the redraw lands on a clean canvas.
+process.stdout.prependListener('resize', () => {
+  process.stdout.write('\x1b[H\x1b[2J');
 });
 
 void app.waitUntilExit().finally(() => {
