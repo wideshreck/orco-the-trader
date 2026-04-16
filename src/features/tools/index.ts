@@ -1,3 +1,4 @@
+import { bootstrapBacktesting } from '../backtesting/index.js';
 import { bootstrapTrading } from '../trading/index.js';
 import { bootstrapWatchlist } from '../watchlist/index.js';
 import { askUser } from './builtin/ask-user.js';
@@ -17,6 +18,7 @@ export function bootstrapTools(): void {
   register(askUser);
   register(todoWrite);
   bootstrapTrading();
+  bootstrapBacktesting();
   bootstrapWatchlist();
   const skillTool = buildSkillTool();
   if (skillTool) register(skillTool);

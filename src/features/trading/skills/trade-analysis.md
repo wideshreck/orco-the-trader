@@ -87,6 +87,20 @@ Always include:
 If the user mentioned risk tolerance or account size, translate the stop distance into position size:
 `size = risk_usd / stop_distance`.
 
+## 5b. Backtest (when user asks "does this work" / "what's the historical edge")
+
+When the user asks whether a strategy has worked, or wants stats before committing to a setup, use `backtest`. It runs an event-driven simulation (no look-ahead) with fees + slippage and returns full metrics.
+
+- Fetch ≥ 500 candles via `get_ohlcv` on the user's chosen horizon.
+- Pick the preset that matches the user's intent:
+  - `rsi_reversal` — mean-reversion at oversold/overbought extremes
+  - `ma_crossover` — trend-following on SMA cross
+  - `bollinger_mean_reversion` — fade the extremes back to the mean
+  - `donchian_breakout` — range break, Turtle-style
+- Report the key metrics: total return, CAGR, max DD %, Sharpe, profit factor, win rate, trades, expectancy, avg R, avg bars held, plus the `buyHoldReturnPct` benchmark.
+- Never call a backtest "profitable" based on ≤ 10 trades. Say so explicitly.
+- Results are a single historical path — flag overfitting risk when the parameters are heavily tuned.
+
 ## 6. Disclose
 
 End every recommendation with the literal line:
