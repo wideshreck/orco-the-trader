@@ -2,52 +2,63 @@
 
 # orco
 
-_Terminal-native AI trading assistant for crypto — multi-provider LLMs, 18+ native tools, event-driven backtesting engine, Model Context Protocol support._
+> Your terminal. Your LLM. No black box.
+
+Ask Orco to analyze a coin, backtest a strategy, or size a position — it calls real functions, shows its work, and never makes up a number.
 
 [![CI](https://github.com/wideshreck/orco-the-trader/actions/workflows/ci.yml/badge.svg)](https://github.com/wideshreck/orco-the-trader/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/orco-the-trader)](https://www.npmjs.com/package/orco-the-trader)
 [![Apache 2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
-[![Bun](https://img.shields.io/badge/bun-%E2%89%A51.3-ffdda1)](https://bun.sh)
-[![Node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/typescript-strict-3178c6)](https://www.typescriptlang.org)
 
-```
- ██████╗ ██████╗  ██████╗ ██████╗
-██╔═══██╗██╔══██╗██╔════╝██╔═══██╗
-██║   ██║██████╔╝██║     ██║   ██║
-██║   ██║██╔══██╗██║     ██║   ██║
-╚██████╔╝██║  ██║╚██████╗╚██████╔╝
- ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚═════╝
+```bash
+npx orco
 ```
 
-Orco is a terminal-first AI agent built for cryptocurrency market analysis. It pulls live data from Binance, computes technical indicators, detects divergences and support/resistance, runs event-driven backtests, and assembles disciplined trade plans — through whichever LLM you prefer: Anthropic, OpenAI, Google, Groq, xAI, OpenRouter, or a local Ollama model. Sessions persist. Tool calls are auditable. Every number comes from a function, not a guess.
+### Why not just ask ChatGPT?
 
-Built on Ink + React for the UI, the Vercel AI SDK for streaming and tool calling, and the Model Context Protocol for plug-in extensibility.
+| | ChatGPT / web chat | Orco |
+|---|---|---|
+| Price data | Guesses or uses training cutoff | Fetches live from Binance (OHLCV, order book, funding, OI) |
+| Indicators | "RSI is around 45" | Computes SMA, EMA, RSI, MACD, ATR, Bollinger, Stoch, VWAP, ADX from real candles |
+| Support / resistance | Eyeballs a chart it can't see | Fractal pivot detection + price clustering with touch counts |
+| Backtesting | "Historically this strategy tends to..." | Event-driven engine, 4 presets, no look-ahead, fee + slippage, Sharpe / PF / max DD |
+| Position sizing | "Risk 1-2% of your account" | `balance × riskPct / stopDistance` → exact qty, notional, R:R |
+| Audit trail | None — output is a monologue | Every number links to a tool call you can inspect |
+| Provider lock-in | OpenAI only | Anthropic, OpenAI, Google, Groq, xAI, OpenRouter, Ollama |
+| Extensibility | Plugins, maybe | MCP (HTTP + STDIO) + drop-in skill files |
 
 ---
 
 ## Quickstart
 
 ```bash
+# one-line install + run
+npx orco
+
+# or clone for development
 git clone https://github.com/wideshreck/orco-the-trader.git
-cd orco-the-trader
-bun install
-
-# pick a provider — one key is enough
-export ANTHROPIC_API_KEY=...
-
-bun dev
+cd orco-the-trader && bun install && bun dev
 ```
 
-Then at the prompt:
+Set at least one API key:
+
+```bash
+export ANTHROPIC_API_KEY=...
+# or OPENAI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, GROQ_API_KEY,
+#    XAI_API_KEY, OPENROUTER_API_KEY, or just run Ollama locally
+```
+
+Then type:
 
 ```
 > full analysis on BTCUSDT 4h
-> top 10 gainers last 24h, scan momentum on 1h
+> top 10 gainers, scan momentum on 1h
 > backtest donchian_breakout on SOLUSDT 1d, last 1000 candles
 > what's the nearest resistance for ETH and how far is the ATR stop
 ```
 
-Orco picks up your language — English, Turkish, or anything in between.
+Orco speaks your language — English, Turkish, or anything in between.
 
 ---
 
