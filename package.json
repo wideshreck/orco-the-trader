@@ -4,7 +4,7 @@
   "description": "Terminal-native AI trading assistant for crypto — multi-provider LLMs, 25 native tools, event-driven backtesting, MCP support",
   "type": "module",
   "bin": {
-    "orco": "./dist/cli/main.js"
+    "orco": "dist/cli/main.js"
   },
   "repository": {
     "type": "git",
