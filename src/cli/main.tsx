@@ -61,14 +61,12 @@ const app = render(
 );
 
 // Resize handling. We render directly to scrollback (no alt-screen) so native
-// up-scroll works. The tradeoff: on SIGWINCH Ink's previous frame has already
-// landed in terminal history at the old width; its next redraw sits on top,
-// leaving stacked frames. We wipe the screen ahead of Ink's own reconciler —
-// prependListener puts our handler before Ink's — so the redraw lands on a
-// clean canvas. React state is preserved; only completed scrollback rows are
-// lost, which is the cost of not using alt-screen.
-process.stdout.prependListener('resize', () => {
-  process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
+// up-scroll works. On SIGWINCH Ink's previous dynamic frame mis-wraps relative
+// to the new width; calling app.clear() erases JUST Ink's tracked output
+// region, not the terminal scrollback above it. Ink's own reconciler then
+// redraws in place at the new width on the next tick.
+process.stdout.on('resize', () => {
+  app.clear();
 });
 
 void app.waitUntilExit().finally(() => {
