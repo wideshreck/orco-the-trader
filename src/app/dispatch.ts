@@ -163,21 +163,20 @@ export function dispatchCommand(trimmed: string, ctx: DispatchCtx): DispatchResu
   if (trimmed === '/prompt') {
     const sp = ctx.systemPrompt?.trim();
     const configLabel = path.join('~', '.config', 'orco', 'config.json');
+    const lines: string[] = [
+      '  built-in base prompt: active (role + methodology + tool_use + output + constraints)',
+      '',
+    ];
     if (sp) {
       const preview = sp.length > 600 ? `${sp.slice(0, 597)}...` : sp;
-      ctx.setInfoPanel({
-        title: 'system prompt',
-        lines: preview
-          .split('\n')
-          .map((l) => `  ${l}`)
-          .concat('', `  edit: ${configLabel} (systemPrompt)`),
-      });
+      lines.push('  user overlay (from config):');
+      lines.push(...preview.split('\n').map((l) => `    ${l}`));
+      lines.push('', `  edit: ${configLabel} (systemPrompt)`);
     } else {
-      ctx.setInfoPanel({
-        title: 'system prompt',
-        lines: ['  (no system prompt set)', `  add "systemPrompt" string in ${configLabel}`],
-      });
+      lines.push('  user overlay: (none)');
+      lines.push(`  add "systemPrompt" string in ${configLabel} to layer extra guidance on top`);
     }
+    ctx.setInfoPanel({ title: 'system prompt', lines });
     return 'handled';
   }
   if (trimmed === '/help') {

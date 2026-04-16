@@ -3,6 +3,7 @@ import { errorMessage, isAbortError } from '../../shared/errors/index.js';
 import type { CatalogProvider, ModelRef } from '../models/catalog.js';
 import type { CompactionPoint } from '../sessions/index.js';
 import type { Approver, TokenUsage } from '../tools/index.js';
+import { BASE_SYSTEM_PROMPT } from './base-prompt.js';
 import { summarizeRows } from './compact.js';
 import { streamChat } from './stream.js';
 
@@ -151,14 +152,14 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
       let stepAssistantId = assistantId;
 
       try {
-        const systemParts: string[] = [];
+        const systemParts: string[] = [BASE_SYSTEM_PROMPT];
         if (systemPrompt?.trim()) systemParts.push(systemPrompt.trim());
         if (activeCp) systemParts.push(`Summary of earlier conversation:\n${activeCp.summary}`);
-        const system = systemParts.length > 0 ? systemParts.join('\n\n') : undefined;
+        const system = systemParts.join('\n\n');
         for await (const ev of streamChat(target.provider, target.ref, baseHistory, {
           signal: controller.signal,
           approver,
-          ...(system ? { system } : {}),
+          system,
         })) {
           switch (ev.type) {
             case 'text-delta': {

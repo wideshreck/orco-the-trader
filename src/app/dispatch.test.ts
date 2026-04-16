@@ -124,12 +124,14 @@ describe('dispatchCommand', () => {
     expect(panel?.lines[0]).toContain('no usage recorded');
   });
 
-  it('/prompt with no systemPrompt shows the empty-state message', () => {
+  it('/prompt with no user overlay shows base prompt + empty overlay notice', () => {
     const ctx = makeCtx();
     dispatchCommand('/prompt', ctx);
     const panel = (ctx as ReturnType<typeof makeCtx>)._last().panel;
     expect(panel?.title).toBe('system prompt');
-    expect(panel?.lines[0]).toContain('no system prompt set');
+    const joined = (panel?.lines ?? []).join('\n');
+    expect(joined).toContain('built-in base prompt');
+    expect(joined).toContain('user overlay: (none)');
   });
 
   it('/prompt with a systemPrompt renders it line-by-line', () => {
