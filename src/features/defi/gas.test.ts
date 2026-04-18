@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { hexToNumber, hexWeiToGwei } from './gas.js';
+import { classifyGas, hexToNumber, hexWeiToGwei } from './gas.js';
 
 describe('hexWeiToGwei', () => {
   it('converts 1 gwei (1e9 wei) to exactly 1 gwei', () => {
@@ -40,5 +40,40 @@ describe('hexToNumber', () => {
   it('returns null for bad input', () => {
     expect(hexToNumber('not-hex')).toBeNull();
     expect(hexToNumber(null)).toBeNull();
+  });
+});
+
+describe('classifyGas', () => {
+  const ethBands = { quiet: 2, normal: 20, busy: 60 };
+
+  it('classifies post-Pectra sub-gwei ETH as idle', () => {
+    expect(classifyGas(0.15, ethBands)).toBe('idle');
+    expect(classifyGas(0.4, ethBands)).toBe('idle');
+  });
+
+  it('classifies sub-2 gwei as quiet', () => {
+    expect(classifyGas(1, ethBands)).toBe('quiet');
+    expect(classifyGas(1.8, ethBands)).toBe('quiet');
+  });
+
+  it('classifies typical ETH gas as normal', () => {
+    expect(classifyGas(5, ethBands)).toBe('normal');
+    expect(classifyGas(15, ethBands)).toBe('normal');
+  });
+
+  it('classifies elevated gas as busy', () => {
+    expect(classifyGas(25, ethBands)).toBe('busy');
+    expect(classifyGas(55, ethBands)).toBe('busy');
+  });
+
+  it('classifies mania-level gas as congested', () => {
+    expect(classifyGas(80, ethBands)).toBe('congested');
+    expect(classifyGas(300, ethBands)).toBe('congested');
+  });
+
+  it('uses per-chain bands so L2 gwei is not called "idle" across the board', () => {
+    const arbBands = { quiet: 0.05, normal: 0.2, busy: 0.8 };
+    expect(classifyGas(0.15, arbBands)).toBe('normal'); // same 0.15 gwei
+    expect(classifyGas(0.01, arbBands)).toBe('idle');
   });
 });
