@@ -2,33 +2,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { errorMessage, isAbortError } from '../../shared/errors/index.js';
 import type { CatalogProvider, ModelRef } from '../models/catalog.js';
 import type { CompactionPoint } from '../sessions/index.js';
-import type { Approver, TokenUsage } from '../tools/index.js';
+import type { Approver } from '../tools/index.js';
+import { applyStreamEvent, finalizeLive, handleTurnError, maxIdOf } from './apply-event.js';
 import { BASE_SYSTEM_PROMPT } from './base-prompt.js';
 import { summarizeRows } from './compact.js';
 import { streamChat } from './stream.js';
+import type { AssistantRow, ChatRow, CompactOutcome, SubmitOutcome, UserRow } from './types.js';
 
-export type UserRow = { id: number; kind: 'user'; content: string };
-export type AssistantRow = {
-  id: number;
-  kind: 'assistant';
-  content: string;
-  error?: boolean;
-  usage?: TokenUsage;
-};
-export type ToolRow = {
-  id: number;
-  kind: 'tool';
-  toolCallId: string;
-  name: string;
-  input: unknown;
-  output?: unknown;
-  error?: string;
-  status: 'pending' | 'awaiting-approval' | 'done' | 'error' | 'denied';
-};
-export type ChatRow = UserRow | AssistantRow | ToolRow;
-
-export type SubmitOutcome = 'sent' | 'empty' | 'busy' | 'no-model';
-export type CompactOutcome = 'compacted' | 'too-short' | 'no-model' | 'busy' | 'error';
+export type {
+  AssistantRow,
+  ChatRow,
+  CompactOutcome,
+  SubmitOutcome,
+  ToolRow,
+  UserRow,
+} from './types.js';
 
 type Target = { provider: CatalogProvider; ref: ModelRef };
 
@@ -84,9 +72,6 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
 
   const cancel = useCallback(() => abortRef.current?.abort(), []);
 
-  // Switch sessions: append loaded rows to scrollback (they print to terminal
-  // history below whatever was already there) and clear live. Past sessions
-  // remain visible above in scrollback.
   const reset = useCallback(
     (load: { rows: ChatRow[]; compactionPoint: CompactionPoint | null }) => {
       setScrollback((prev) => [...prev, ...load.rows]);
@@ -102,9 +87,6 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
     [],
   );
 
-  // /new and /clear: wipe everything — scrollback state, live area, compaction
-  // point, committed ids. The parent is expected to also clear the terminal
-  // (process.stdout.write '\x1b[2J\x1b[3J\x1b[H') so the visual slate matches.
   const clear = useCallback(() => {
     setScrollback([]);
     setLive([]);
@@ -121,18 +103,10 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
 
       const userMsg: UserRow = { id: nextId(), kind: 'user', content: trimmed };
       const assistantId = nextId();
-      const initialAssistant: AssistantRow = {
-        id: assistantId,
-        kind: 'assistant',
-        content: '',
-      };
+      const initialAssistant: AssistantRow = { id: assistantId, kind: 'assistant', content: '' };
       const activeCp = compactionPoint;
       const visibleHistory = activeCp ? messages.filter((r) => r.id > activeCp.afterId) : messages;
       const baseHistory = [...visibleHistory, userMsg];
-      // Commit the user row straight to scrollback so Ink's dynamic area only
-      // carries the actively streaming assistant (and any pending tool rows).
-      // This keeps the dynamic block short enough that in-place redraws don't
-      // scroll past the top of the terminal and leak old frames.
       setScrollback((prev) => [...prev, userMsg]);
       setLive([initialAssistant]);
       setStreaming(true);
@@ -141,118 +115,31 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
 
       const controller = new AbortController();
       abortRef.current = controller;
-
-      let assistantAcc = '';
-      let activeAssistantId = assistantId;
-      // The assistant row that corresponds to the current LLM step. A step
-      // emits text-delta → (optional) tool-call → finish-step (with usage).
-      // activeAssistantId advances immediately on tool-call to receive the
-      // next step's text, but the just-finishing step's usage still belongs
-      // to the PREVIOUS assistant row. Track it separately.
-      let stepAssistantId = assistantId;
+      const ctx = {
+        assistantAcc: '',
+        activeAssistantId: assistantId,
+        stepAssistantId: assistantId,
+        nextId,
+      };
 
       try {
-        const systemParts: string[] = [BASE_SYSTEM_PROMPT];
-        if (systemPrompt?.trim()) systemParts.push(systemPrompt.trim());
-        if (activeCp) systemParts.push(`Summary of earlier conversation:\n${activeCp.summary}`);
-        const system = systemParts.join('\n\n');
+        const system = buildSystemPrompt(systemPrompt, activeCp);
         for await (const ev of streamChat(target.provider, target.ref, baseHistory, {
           signal: controller.signal,
           approver,
           system,
         })) {
-          switch (ev.type) {
-            case 'text-delta': {
-              assistantAcc += ev.delta;
-              const captured = assistantAcc;
-              const targetId = activeAssistantId;
-              setLive((prev) =>
-                prev.map((r) =>
-                  r.id === targetId && r.kind === 'assistant' ? { ...r, content: captured } : r,
-                ),
-              );
-              break;
-            }
-            case 'tool-call': {
-              const row: ToolRow = {
-                id: nextId(),
-                kind: 'tool',
-                toolCallId: ev.toolCallId,
-                name: ev.toolName,
-                input: ev.input,
-                status: 'pending',
-              };
-              const newAssistantId = nextId();
-              activeAssistantId = newAssistantId;
-              assistantAcc = '';
-              setLive((prev) => [
-                ...prev,
-                row,
-                { id: newAssistantId, kind: 'assistant', content: '' },
-              ]);
-              break;
-            }
-            case 'approval-request': {
-              setLive((prev) =>
-                prev.map((r) =>
-                  r.kind === 'tool' && r.toolCallId === ev.toolCallId
-                    ? { ...r, status: 'awaiting-approval' }
-                    : r,
-                ),
-              );
-              break;
-            }
-            case 'tool-result': {
-              setLive((prev) =>
-                prev.map((r) =>
-                  r.kind === 'tool' && r.toolCallId === ev.toolCallId
-                    ? { ...r, output: ev.output, status: 'done' }
-                    : r,
-                ),
-              );
-              break;
-            }
-            case 'tool-error': {
-              const denied = ev.error === 'denied by user';
-              setLive((prev) =>
-                prev.map((r) =>
-                  r.kind === 'tool' && r.toolCallId === ev.toolCallId
-                    ? { ...r, error: ev.error, status: denied ? 'denied' : 'error' }
-                    : r,
-                ),
-              );
-              break;
-            }
-            case 'usage': {
-              const targetId = stepAssistantId;
-              const usage = ev.usage;
-              setLive((prev) =>
-                prev.map((r) =>
-                  r.id === targetId && r.kind === 'assistant' ? { ...r, usage } : r,
-                ),
-              );
-              stepAssistantId = activeAssistantId;
-              break;
-            }
-          }
+          applyStreamEvent(ev, ctx, setLive);
         }
       } catch (err: unknown) {
         const aborted = isAbortError(err);
         const errText = aborted ? '(canceled)' : `Error: ${errorMessage(err)}`;
-        const targetId = activeAssistantId;
-        setLive((prev) =>
-          prev.map((r) => {
-            if (r.id !== targetId || r.kind !== 'assistant') return r;
-            const next: AssistantRow = { ...r, content: errText };
-            if (!aborted) next.error = true;
-            return next;
-          }),
-        );
+        handleTurnError(ctx.activeAssistantId, setLive, aborted, errText);
       } finally {
         setStreaming(false);
         abortRef.current = null;
         setLive((current) => {
-          const trimmed = trimEmptyTrailingAssistant(current);
+          const trimmed = finalizeLive(current);
           for (const row of trimmed) {
             if (committedIdsRef.current.has(row.id)) continue;
             committedIdsRef.current.add(row.id);
@@ -323,17 +210,9 @@ export function useChat(target: Target | null, approver: Approver, opts: UseChat
   };
 }
 
-function maxIdOf(rows: ChatRow[]): number {
-  let m = 0;
-  for (const r of rows) if (r.id > m) m = r.id;
-  return m;
-}
-
-function trimEmptyTrailingAssistant(rows: ChatRow[]): ChatRow[] {
-  if (rows.length === 0) return rows;
-  const last = rows[rows.length - 1];
-  if (last && last.kind === 'assistant' && last.content === '' && !last.error) {
-    return rows.slice(0, -1);
-  }
-  return rows;
+function buildSystemPrompt(userPrompt: string | undefined, cp: CompactionPoint | null): string {
+  const parts: string[] = [BASE_SYSTEM_PROMPT];
+  if (userPrompt?.trim()) parts.push(userPrompt.trim());
+  if (cp) parts.push(`Summary of earlier conversation:\n${cp.summary}`);
+  return parts.join('\n\n');
 }

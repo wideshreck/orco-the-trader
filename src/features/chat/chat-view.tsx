@@ -1,14 +1,16 @@
 import { Box, Static, Text } from 'ink';
 import type { SlashCommand } from '../../commands/index.js';
-import { renderMarkdown } from '../../shared/ui/markdown.js';
 import { MultiLineInput } from '../../shared/ui/multi-line-input.js';
 import { type Todo, TodosView } from '../todos/index.js';
 import { ApprovalPrompt } from '../tools/approval-prompt.js';
 import type { ApprovalRequest, QuestionRequest, TokenUsage } from '../tools/index.js';
 import { QuestionPrompt } from '../tools/question-prompt.js';
-import { formatTokens } from './cost.js';
-import { ToolCallView } from './tool-call-view.js';
-import type { ChatRow } from './use-chat.js';
+import { ChatRowView, lastTurnInput, sumTokens } from './chat-row-view.js';
+import type { CostBreakdown } from './cost.js';
+import { InfoPanelView } from './info-panel.js';
+import { QueuePreview } from './queue-preview.js';
+import { StatusBar } from './status-bar.js';
+import type { ChatRow } from './types.js';
 
 export type ChatFocus = 'input' | 'tools-bar' | 'tools-panel';
 
@@ -28,10 +30,13 @@ export function ChatView(props: {
   suggestions: SlashCommand[];
   suggestionIdx: number;
   approval: ApprovalRequest | null;
+  approvalExpanded: boolean;
   infoPanel: InfoPanel | null;
   formatUsage: (usage: TokenUsage) => string;
+  totalCost: CostBreakdown | null;
   contextLimit: number | null;
   compactionActive: boolean;
+  catalogStale: boolean;
   queue: string[];
   question: QuestionRequest | null;
   questionDraft: string;
@@ -52,6 +57,7 @@ export function ChatView(props: {
     suggestions,
     suggestionIdx,
     approval,
+    approvalExpanded,
     infoPanel,
   } = props;
   const {
@@ -79,14 +85,10 @@ export function ChatView(props: {
   const { contextLimit, compactionActive } = props;
   const ratio =
     contextLimit && contextLimit > 0 && lastInputTokens > 0 ? lastInputTokens / contextLimit : 0;
-  const contextColor: 'green' | 'yellow' | 'red' =
-    ratio < 0.5 ? 'green' : ratio < 0.8 ? 'yellow' : 'red';
-  const contextWarn = ratio >= 0.75;
+  const contextWarn = ratio >= 0.9;
 
   return (
     <>
-      {/* Static prints each row exactly once and commits it to terminal scrollback.
-          Past turns scroll up out of the dynamic area so native terminal scroll works. */}
       <Static items={visibleScrollback}>
         {(row) => (
           <Box key={`${row.id}-${resizeEpoch}`} paddingX={2}>
@@ -102,7 +104,6 @@ export function ChatView(props: {
           )}
           {live.map((msg, i) => {
             const isLastAssistant = msg.kind === 'assistant' && i === live.length - 1 && streaming;
-            // Same filter as scrollback: drop empty non-active assistant rows.
             if (msg.kind === 'assistant' && !msg.content && !msg.error && !isLastAssistant) {
               return null;
             }
@@ -110,7 +111,7 @@ export function ChatView(props: {
               <ChatRowView
                 key={msg.id}
                 row={msg}
-                placeholder={isLastAssistant ? '…' : ''}
+                thinking={isLastAssistant}
                 formatUsage={props.formatUsage}
               />
             );
@@ -118,7 +119,7 @@ export function ChatView(props: {
         </Box>
 
         <TodosView todos={todos} />
-        {approval && <ApprovalPrompt request={approval} />}
+        {approval && <ApprovalPrompt request={approval} expanded={approvalExpanded} />}
         {question && (
           <QuestionPrompt
             request={question}
@@ -128,26 +129,7 @@ export function ChatView(props: {
             isActive={questionInputActive}
           />
         )}
-        {infoPanel && (
-          <Box
-            flexDirection="column"
-            borderStyle="round"
-            borderColor="cyan"
-            paddingX={1}
-            paddingY={1}
-            marginY={1}
-          >
-            <Text color="cyan" bold>
-              {infoPanel.title}
-            </Text>
-            {infoPanel.lines.map((line) => (
-              <Text key={line}>{line}</Text>
-            ))}
-            <Box marginTop={1}>
-              <Text dimColor>press esc · enter · space to dismiss</Text>
-            </Box>
-          </Box>
-        )}
+        {infoPanel && <InfoPanelView panel={infoPanel} />}
         {showSuggestions && (
           <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
             {suggestions.map((cmd, i) => {
@@ -174,6 +156,8 @@ export function ChatView(props: {
             </Box>
           </Box>
         )}
+
+        <QueuePreview queue={queue} />
 
         <Box
           borderStyle="round"
@@ -206,46 +190,28 @@ export function ChatView(props: {
 
         {contextWarn && (
           <Box>
-            <Text color="yellow">
-              ⚠ context {Math.round(ratio * 100)}% full — /compact to summarize older messages
+            <Text color="red">
+              [!] context {Math.round(ratio * 100)}% full — /compact to summarize older messages
             </Text>
           </Box>
         )}
-        <Box paddingX={1} justifyContent="space-between">
+        {props.catalogStale && (
           <Box>
-            <Text dimColor>{modelLabel}</Text>
-            <Text dimColor> · </Text>
-            <Text dimColor>{truncateLabel(sessionLabel)}</Text>
-            {totalTokens.inputTokens + totalTokens.outputTokens > 0 && (
-              <Text dimColor>
-                {' · '}
-                {formatTokens(totalTokens.inputTokens)}/{formatTokens(totalTokens.outputTokens)}
-              </Text>
-            )}
-            {contextLimit && lastInputTokens > 0 && (
-              <Text color={contextColor}>
-                {' · '}
-                {formatTokens(lastInputTokens)}/{formatTokens(contextLimit)} (
-                {Math.round(ratio * 100)}%)
-              </Text>
-            )}
-            {compactionActive && <Text color="cyan">{' · compacted'}</Text>}
-            {queue.length > 0 && (
-              <Text color="yellow">
-                {' · '}
-                {queue.length} queued
-              </Text>
-            )}
-            {focus === 'tools-bar' && (
-              <Text dimColor>{'  '}(↓ tools-bar focused · enter open · esc back)</Text>
-            )}
+            <Text color="yellow">[!] using cached model catalog — models.dev unreachable</Text>
           </Box>
-          {exitWarning ? (
-            <Text color="yellow">press ctrl+c again to exit</Text>
-          ) : (
-            <Text dimColor>ctrl+c to exit</Text>
-          )}
-        </Box>
+        )}
+        <StatusBar
+          modelLabel={modelLabel}
+          sessionLabel={sessionLabel}
+          totalTokens={totalTokens}
+          totalCost={props.totalCost}
+          lastInputTokens={lastInputTokens}
+          contextLimit={contextLimit}
+          compactionActive={compactionActive}
+          queueCount={queue.length}
+          focus={focus}
+          exitWarning={exitWarning}
+        />
 
         {focus === 'tools-panel' && (
           <Box
@@ -270,62 +236,4 @@ export function ChatView(props: {
       </Box>
     </>
   );
-}
-
-function ChatRowView(props: {
-  row: ChatRow;
-  placeholder?: string;
-  formatUsage: (usage: TokenUsage) => string;
-}) {
-  const { row, placeholder = '', formatUsage } = props;
-  if (row.kind === 'tool') return <ToolCallView row={row} />;
-  const isUser = row.kind === 'user';
-  const badgeColor = isUser ? 'green' : 'magenta';
-  const badgeLabel = isUser ? ' you ' : ' orco ';
-  return (
-    <Box flexDirection="column" marginBottom={1}>
-      <Box marginBottom={1}>
-        <Text color={badgeColor} inverse bold>
-          {badgeLabel}
-        </Text>
-      </Box>
-      {row.kind === 'assistant' && row.error ? (
-        <Text color="red">{row.content}</Text>
-      ) : row.kind === 'assistant' ? (
-        <Text>{row.content ? renderMarkdown(row.content) : placeholder}</Text>
-      ) : (
-        <Text>{row.content}</Text>
-      )}
-      {row.kind === 'assistant' && row.usage && (
-        <Box marginTop={1}>
-          <Text dimColor>{formatUsage(row.usage)}</Text>
-        </Box>
-      )}
-    </Box>
-  );
-}
-
-function sumTokens(rows: ChatRow[]): TokenUsage {
-  let inputTokens = 0;
-  let outputTokens = 0;
-  for (const r of rows) {
-    if (r.kind === 'assistant' && r.usage) {
-      inputTokens += r.usage.inputTokens;
-      outputTokens += r.usage.outputTokens;
-    }
-  }
-  return { inputTokens, outputTokens };
-}
-
-function lastTurnInput(rows: ChatRow[]): number {
-  for (let i = rows.length - 1; i >= 0; i--) {
-    const r = rows[i];
-    if (r && r.kind === 'assistant' && r.usage) return r.usage.inputTokens;
-  }
-  return 0;
-}
-
-function truncateLabel(s: string): string {
-  if (s.length <= 30) return s;
-  return `${s.slice(0, 29)}…`;
 }

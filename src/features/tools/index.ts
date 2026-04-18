@@ -31,6 +31,11 @@ export {
   setAlwaysAllowed,
 } from './approvals.js';
 export { defineTool } from './define.js';
+export {
+  clearExternalDescriptions,
+  describeTool,
+  registerExternalDescription,
+} from './describe.js';
 export { askHumanUser, setQuestionAsker } from './question.js';
 export {
   buildAiSdkTools,

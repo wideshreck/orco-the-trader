@@ -1,16 +1,32 @@
 import { Box, Text } from 'ink';
+import { useRef } from 'react';
+import { Elapsed, Spinner } from '../../shared/ui/spinner.js';
+import { stripAnsi } from '../../shared/ui/strip-ansi.js';
+import { describeTool } from '../tools/describe.js';
 import type { ToolRow } from './use-chat.js';
 
 export function ToolCallView(props: { row: ToolRow }) {
   const { row } = props;
-  const icon = iconFor(row.status);
   const color = colorFor(row.status);
   const inputSummary = summarizeInput(row.input);
+  const description = describeTool(row.name);
+  const running = row.status === 'pending' || row.status === 'awaiting-approval';
+  // Pin start time on first mount; keeps the elapsed counter stable even
+  // though the row's status transitions pending → awaiting-approval → done.
+  const startRef = useRef<number>(Date.now());
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Box>
+        {running ? (
+          <Spinner color={row.status === 'awaiting-approval' ? 'yellow' : 'cyan'} />
+        ) : (
+          <Text color={color} bold>
+            {iconFor(row.status)}
+          </Text>
+        )}
         <Text color={color} bold>
-          {icon} {row.name}
+          {' '}
+          {row.name}
         </Text>
         {inputSummary && (
           <Text dimColor>
@@ -19,6 +35,13 @@ export function ToolCallView(props: { row: ToolRow }) {
           </Text>
         )}
       </Box>
+      {description && running && (
+        <Box paddingLeft={2}>
+          <Text dimColor italic>
+            {description}
+          </Text>
+        </Box>
+      )}
       {row.status === 'done' && row.output !== undefined && (
         <Box paddingLeft={2}>
           <Text dimColor>→ {summarizeOutput(row.output)}</Text>
@@ -31,12 +54,20 @@ export function ToolCallView(props: { row: ToolRow }) {
       )}
       {row.status === 'awaiting-approval' && (
         <Box paddingLeft={2}>
-          <Text color="yellow">awaiting approval</Text>
+          <Text color="yellow">awaiting approval · press </Text>
+          <Text color="green">a</Text>
+          <Text color="yellow">/</Text>
+          <Text color="red">d</Text>
+          <Text color="yellow">/</Text>
+          <Text color="cyan">A</Text>
+          <Text color="yellow"> · </Text>
+          <Elapsed startMs={startRef.current} dim={false} />
         </Box>
       )}
       {row.status === 'pending' && (
         <Box paddingLeft={2}>
-          <Text dimColor>running...</Text>
+          <Text dimColor>running · </Text>
+          <Elapsed startMs={startRef.current} />
         </Box>
       )}
     </Box>
@@ -149,6 +180,6 @@ function stringify(value: unknown): string {
 }
 
 function clip(s: string, limit: number): string {
-  const oneLine = s.replace(/\s+/g, ' ');
+  const oneLine = stripAnsi(s).replace(/\s+/g, ' ');
   return oneLine.length > limit ? `${oneLine.slice(0, limit)}…` : oneLine;
 }

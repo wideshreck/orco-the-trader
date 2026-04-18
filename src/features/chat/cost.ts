@@ -36,3 +36,25 @@ export function formatUsageLine(usage: TokenUsage, cost: CostBreakdown | null): 
   const tokens = `${formatTokens(usage.inputTokens)} in · ${formatTokens(usage.outputTokens)} out`;
   return cost ? `${tokens} · ${formatUsd(cost.totalUsd)}` : tokens;
 }
+
+// Aggregate session-wide cost. Returns null when either no usage has been
+// recorded or the model has no price metadata, so callers can decide whether
+// to show a running total at all.
+export function totalSessionCost(
+  rows: { kind: string; usage?: TokenUsage }[],
+  catalog: Catalog,
+  ref: ModelRef,
+): CostBreakdown | null {
+  let input = 0;
+  let output = 0;
+  let total = 0;
+  for (const row of rows) {
+    if (row.kind !== 'assistant' || !row.usage) continue;
+    const c = computeCost(row.usage, catalog, ref);
+    if (!c) continue;
+    input += c.inputUsd;
+    output += c.outputUsd;
+    total += c.totalUsd;
+  }
+  return total > 0 ? { inputUsd: input, outputUsd: output, totalUsd: total } : null;
+}

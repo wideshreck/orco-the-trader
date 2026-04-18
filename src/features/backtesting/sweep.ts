@@ -1,14 +1,6 @@
 import { runBacktest } from './engine.js';
 import { findPreset } from './presets/index.js';
-import type {
-  BacktestConfig,
-  BacktestResult,
-  Bar,
-  Fees,
-  Metrics,
-  RiskConfig,
-  Side,
-} from './types.js';
+import type { BacktestConfig, BacktestResult, Bar, Fees, RiskConfig, Side } from './types.js';
 
 export type SweepRange = {
   param: string;

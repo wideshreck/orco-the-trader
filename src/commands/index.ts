@@ -12,6 +12,7 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
   { name: '/help', description: 'show all commands' },
   { name: '/log', description: 'show debug log path and status' },
   { name: '/mcp', description: 'list configured MCP servers and their status' },
+  { name: '/mcp reload', description: 'reconnect all MCP servers' },
   { name: '/model', description: 'select model' },
   { name: '/new', description: 'start a new session' },
   { name: '/prompt', description: 'show active system prompt' },

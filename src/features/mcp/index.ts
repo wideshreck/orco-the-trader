@@ -1,5 +1,6 @@
 import type { ToolSet } from 'ai';
 import { logger } from '../../shared/logging/logger.js';
+import { clearExternalDescriptions, registerExternalDescription } from '../tools/describe.js';
 import type { Approver } from '../tools/types.js';
 import { type ConnectedServer, connectServer, gateMcpTools } from './client.js';
 import type { McpServerConfig, McpServerEntry, McpServerStatus } from './types.js';
@@ -30,6 +31,12 @@ export async function bootstrapMcp(
         const conn = await connectServer(name, config);
         clients.set(name, conn);
         const toolCount = Object.keys(conn.tools).length;
+        for (const [toolName, tool] of Object.entries(conn.tools)) {
+          const displayKey = `${conn.name}_${toolName}`;
+          const description = (tool as { description?: string }).description ?? '';
+          registerExternalDescription(displayKey, description);
+          registerExternalDescription(toolName, description);
+        }
         registry.set(name, {
           name,
           config,
@@ -49,6 +56,7 @@ export async function shutdownMcp(): Promise<void> {
   const closing = [...clients.values()].map((c) => c.client.close().catch(() => undefined));
   clients.clear();
   registry.clear();
+  clearExternalDescriptions();
   bootstrapped = false;
   await Promise.all(closing);
 }

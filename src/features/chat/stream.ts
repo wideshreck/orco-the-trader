@@ -64,7 +64,7 @@ export async function* streamChat(
     model,
     messages: messagesWithSystem,
     tools,
-    stopWhen: stepCountIs(20),
+    stopWhen: stepCountIs(40),
     ...(opts.signal ? { abortSignal: opts.signal } : {}),
   });
 
