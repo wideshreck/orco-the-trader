@@ -1,4 +1,5 @@
 import { Box, Text, useInput } from 'ink';
+import { useColumns } from './use-columns.js';
 
 /** Minimal multi-line text input for Ink. Handles:
  *  - Enter submits the current value
@@ -7,9 +8,22 @@ import { Box, Text, useInput } from 'ink';
  *  - Backspace removes one char (including newlines)
  *  - Typing appends characters; pasted text with embedded newlines is preserved
  *
- * Arrow keys, Tab, Esc, Ctrl/Meta combos are ignored here so the parent
- * useInput handlers (history, suggestions, focus routing) remain authoritative.
+ *  Long pastes (> MAX_VISIBLE_LINES or wider than the terminal) collapse into
+ *  a viewport: the tail of the value is shown, a dim header tells the user
+ *  how much is hidden above, and individual visible lines are clipped to
+ *  the terminal width with an ellipsis. The full value is still what gets
+ *  submitted — this is a render concern only.
+ *
+ *  Arrow keys, Tab, Esc, Ctrl/Meta combos are ignored here so the parent
+ *  useInput handlers (history, suggestions, focus routing) remain authoritative.
  */
+const MAX_VISIBLE_LINES = 6;
+const MIN_VISIBLE_COLS = 20;
+// Chat-view wraps the input in a bordered `Box paddingX={1}` plus emits a
+// "$ " prefix before us. Reserve those columns so our clipped lines don't
+// themselves get wrapped by Ink a second time.
+const COLUMN_OVERHEAD = 8;
+
 export function MultiLineInput(props: {
   value: string;
   onChange: (v: string) => void;
@@ -19,6 +33,8 @@ export function MultiLineInput(props: {
   showCursor?: boolean;
 }) {
   const { value, onChange, onSubmit, placeholder, isActive, showCursor = true } = props;
+  const cols = useColumns();
+  const maxChars = Math.max(MIN_VISIBLE_COLS, cols - COLUMN_OVERHEAD);
 
   useInput(
     (ch, key) => {
@@ -55,15 +71,28 @@ export function MultiLineInput(props: {
       </Text>
     );
   }
+
   const lines = value.split('\n');
+  const hiddenCount = Math.max(0, lines.length - MAX_VISIBLE_LINES);
+  const visibleLines = hiddenCount > 0 ? lines.slice(-MAX_VISIBLE_LINES) : lines;
+
   return (
     <Box flexDirection="column">
-      {lines.map((line, i) => (
-        <Text key={`${i}-${line.length}`}>
-          {line}
-          {i === lines.length - 1 && showCursor ? '▎' : ''}
+      {hiddenCount > 0 && (
+        <Text dimColor>
+          ↑ {hiddenCount} more line{hiddenCount === 1 ? '' : 's'} above · {value.length} chars total
         </Text>
-      ))}
+      )}
+      {visibleLines.map((line, i) => {
+        const clipped = line.length > maxChars ? `${line.slice(0, maxChars - 1)}…` : line;
+        const isLast = i === visibleLines.length - 1;
+        return (
+          <Text key={`${i}-${line.length}`}>
+            {clipped}
+            {isLast && showCursor ? '▎' : ''}
+          </Text>
+        );
+      })}
     </Box>
   );
 }
