@@ -7,6 +7,8 @@ description: Structured technical analysis workflow for crypto/forex pairs. Use 
 
 Follow this workflow precisely when the user asks for market analysis. Do not skip steps. Use the `todo_write` tool if the task spans more than two indicators or multiple symbols — it keeps the user informed.
 
+The workflow ends in one of two outputs: a concrete trade plan, OR a "stand aside + what would flip it" verdict. Both are valid. Do not manufacture an entry just because the user asked for one; users ask for a trade, what they actually need is the right answer.
+
 ## 1. Clarify if needed
 
 If the user's request is genuinely ambiguous (no symbol, no timeframe), call `ask_user` with specific choices rather than guessing. Skip this step when the intent is clear.
@@ -18,109 +20,114 @@ If the user asks "top movers", "what's pumping", "scan the market", or gives a l
 - Starting blind? Call `list_top_symbols` (sortBy `gainers` / `losers` / `volume`). Cheap, one request. Take the top 5–15 results as the candidate set.
 - Already have the candidate set? Call `scan_market` with the symbols and the chosen interval. It returns ticker + RSI + SMA deviation + interval-change per symbol in one response — ~2 requests per symbol, run in parallel.
 
-Only after filtering down to 1–3 interesting symbols do you proceed to the per-symbol deep-dive below (get_ohlcv + compute_indicators + order book / funding).
+Only after filtering down to 1–3 interesting symbols do you proceed to the per-symbol deep-dive below.
 
-## 1c. Multi-timeframe confluence
+## 2. Macro context first (do not skip)
 
-When the user wants a strong signal ("is this a good entry", "swing setup on X"), prefer `multi_timeframe_analysis` over running `get_ohlcv` + `compute_indicators` three times. It runs the same indicator set across 1h / 4h / 1d (or a custom set) in parallel and returns per-TF trend/momentum/strength biases plus an `alignment` summary.
+Before touching the 4h or 1h chart, see where the larger regime sits. Fetch daily with `limit=365` to see a full year. Look for:
 
-Use the `alignment.aligned` boolean (≥75% of TFs agree on direction) as a gate: trade setups in the direction of alignment have meaningfully higher odds. If alignment is false, say the TFs disagree and either drop the trade or pick the higher-TF bias.
+- The multi-month trend direction (up / down / range). Where did the last major high and low print? How far below the all-time high is price now?
+- Where price sits relative to major structural levels (prior cycle highs / lows, multi-month support).
+- Whether a "current uptrend" the user is eyeing is the real trend or just a recovery leg inside a larger downtrend. Call this out explicitly.
 
-## 2. Fast path — `full_analysis`
+If daily lookback is short (<300 bars) or the user's horizon is position-sized, refetch with `limit=500` or `limit=1000`. A 14-week window inside a 13-month downtrend is the classic timeframe-cherry-pick that gets traders stopped out.
 
-When the question is "read this symbol" / "how's X looking" / "swing setup on Y", prefer `full_analysis`. It runs ohlcv + ticker + multi-TF + indicators + S/R + divergence (+ funding + order book + macro) in parallel and returns a structured digest. One call replaces 6–8 sequential tool calls.
+## 3. Relative strength against BTC (when the symbol is not BTC)
 
-Use the targeted tools below when the user asks something focused (just price, just RSI, just a level) or when `full_analysis` returned null for the slice you need.
+For any altcoin trade, call `relative_strength` with `symbol` and `vs: 'BTCUSDT'` before making a directional recommendation. High correlation with BTC does not tell you whether the symbol is the leader or the weaker sibling — relative_strength does.
 
-## 2b. Validate before publishing
+- `trend: rising` → the symbol is outperforming, a long here has relative edge.
+- `trend: flat` → no leadership edge; the trade is effectively leveraged exposure to BTC. Label it as such.
+- `trend: falling` → the symbol is bleeding against BTC. Long exposure here is a strictly worse version of long-BTC. Flag this in the output verbatim; it usually shifts the recommendation toward "trade BTC instead" or "wait for the ratio to stop bleeding".
 
-Before sending a trade plan to the user, run `validate_trade_plan` on your chosen entry / stop / takeProfit (and pass the current price + ATR if you have them). It catches wrong-side stops, sub-minRR setups, ATR-misaligned stops, and chasing entries. If verdict is `invalid`, fix the plan before replying. If `warnings`, surface the warning in your reply.
+Pair with `correlate_assets` when needed. Coupling (correlation) tells you "do they move together"; leadership (relative_strength) tells you "which one is leading" — you need both.
 
-## 3. Fetch data
+## 4. Multi-timeframe confluence
 
-Call `get_ohlcv` with a Binance spot pair (BTCUSDT, ETHUSDT, etc.). Pick the interval by horizon:
+Prefer `multi_timeframe_analysis` over running `get_ohlcv` + `compute_indicators` three times. It runs the same indicator set across 1h / 4h / 1d in parallel and returns per-TF trend / momentum / strength biases plus an `alignment` summary.
 
-| User horizon | Interval |
-|---|---|
-| scalp / intraday quick | 5m – 15m |
-| intraday / day trade | 30m – 1h |
-| swing | 4h – 1d |
-| position / investor | 1d – 1w |
+Use `alignment.aligned` (≥75% of TFs agreeing on direction) as a gate: setups aligned with the higher TFs have meaningfully higher odds. If alignment is false, say the TFs disagree and either drop the trade or pick the higher-TF bias and state you're fading the lower.
 
-Fetch 200 candles by default (enough history for sma200 when relevant; fewer if the interval or pair does not support it).
+## 5. Single-symbol deep dive
 
-For a full market read also call:
+When the focus narrows to one symbol, use `full_analysis` to batch ohlcv + ticker + multi-TF + indicators + S/R + divergence + funding + order book + macro. One call replaces 6–8 sequential tool calls.
 
-- `get_ticker_24h` once — 24h change, high/low, volume. Low `quoteVolume` (< 10M USDT for alts, < 100M for majors) means thin liquidity; widen stops or skip.
-- `get_order_book` (limit 50 or 100) when the user asks about short-term direction or a scalp entry. Read `imbalance` (>0.6 bullish pressure, <0.4 bearish), `spreadPct` (>0.1% = thin book), and any visible walls in top levels.
-- `get_funding_rate` when the symbol has a perp and the horizon is intraday / swing. |rate| > 0.05% is extreme — contrarian bias. Skip for low-cap spot-only pairs.
+Use the targeted tools below when the user asks something focused (just price, just RSI, just a level) or when `full_analysis` returned null for a slice.
 
-## 4. Compute indicators
+### 5a. Data depth reminder
 
-Always use `compute_indicators` — never estimate these by reading candles. Recommended default set:
+`get_ohlcv` defaults to 100 candles. That's fine for a price check, insufficient for a swing read. For daily analysis fetch ≥300 bars. For a position trade or a backtest, 500–1000.
 
-- `sma20`, `sma50` — trend direction
-- `sma200` (only if ≥200 candles available) — long-term trend bias
-- `rsi14` — momentum
-- `macd` — momentum confirmation
-- `atr14` — volatility gauge for stop sizing
+### 5b. Indicator pack
 
-Optional add-ons when the read calls for it:
+Always use `compute_indicators`. Read `volumeSignal` on the result — it classifies the latest bar's volume against its 20-bar average (surge / above / normal / below / dry). A breakout on "dry" or "below" volume is a low-confidence move and often reverses; a breakout on "surge" is a conviction signal. Do not recommend a breakout trade without stating the volume signal.
 
-- `bb20` — mean-reversion / breakout context. `percentB` > 1 = closed above upper band (stretched), < 0 = below lower band. Low `bandwidth` = squeeze, breakout often follows.
-- `stoch` — overbought (>80) / oversold (<20) confirmation alongside RSI; %K crossing %D = signal.
-- `adx14` — trend **strength**. <20 = chop (skip trend-following), 20–25 = developing, >25 = strong trend. Pair direction with `plusDI` vs `minusDI`.
-- `vwap` — price above/below anchored VWAP as a simple bias filter on intraday timeframes.
+### 5c. Order flow + funding (when intraday / perp exposure matters)
 
-## 5. Read the tape
+- `get_order_book` — read `imbalance` (>0.6 bullish pressure, <0.4 bearish), `spreadPct` (>0.1% = thin book), visible walls.
+- `get_funding_rate` when the symbol has a perp and horizon is intraday / swing. |rate| > 0.05% is extreme — contrarian bias.
 
-Summarize the structure in this exact order (keeps the output scannable):
+## 6. Build the bull case AND the bear case
 
-1. **Price action** — last close, recent range, notable swing highs/lows visible in the last 20 candles.
-2. **Trend** — price vs sma20/sma50 (and sma200 if present). Stacking order tells the trend.
-3. **Momentum** — RSI reading (overbought > 70, oversold < 30, neutral 40–60); MACD line vs signal and histogram direction.
-4. **Volatility** — ATR in price units AND as a % of close. High vs recent norm → tighter stops or wider.
-5. **Volume** — 24h `quoteVolume` from ticker; recent candle volume vs avg if it stands out.
-6. **Order flow** (if fetched) — bid/ask imbalance, spread, nearby walls.
-7. **Funding** (if fetched) — rate + pct. Extreme readings flip the bias toward a fade.
+Before writing a trade plan, state the two cases in the internal reasoning:
 
-## 6. Recommendation (if user asked for a trade)
+**For the trade:** list the 3 strongest confluent signals (e.g. aligned MTF trend up + rising BTC ratio + surge volume on breakout).
 
-Always include:
+**Against the trade:** list the strongest counter-signals (e.g. RSI overbought + funding extreme + bleeding ETH/BTC ratio + approaching major resistance with thin book).
 
-- **Bias:** long / short / neutral with confidence: low / med / high.
-- **Entry:** a specific price or condition ("break above X on 4h close").
-- **Stop-loss:** based on structure (recent swing) AND ATR (e.g., `entry − 1.5 × ATR14`).
-- **Take-profit:** first TP at next structural resistance, second TP optionally with a measured move. Include the resulting R:R.
-- **Invalidation:** one line describing what would kill the thesis.
+Compare. If the bear case is equal to or stronger than the bull case, the verdict is **stand aside**; skip to step 8.
 
-If the user mentioned risk tolerance or account size, translate the stop distance into position size:
-`size = risk_usd / stop_distance`.
+If the bull case dominates cleanly, proceed to step 7.
 
-## 6b. Backtest (when user asks "does this work" / "what's the historical edge")
+If neither dominates, say so and default to stand aside rather than manufacturing certainty.
 
-When the user asks whether a strategy has worked, or wants stats before committing to a setup, use `backtest`. It runs an event-driven simulation (no look-ahead) with fees + slippage and returns full metrics.
+## 7. Trade plan (only when bull case dominates)
+
+Before publishing, run `validate_trade_plan` on your chosen entry / stop / takeProfit. It catches wrong-side stops, sub-minRR setups, ATR-misaligned stops, chasing entries. Fix the plan if verdict is `invalid`; surface the warning if `warnings`.
+
+Size the position with `position_size` (balance × riskPct ÷ stopDistance). Default riskPct is **1**. If the user stated a budget ("$2k of ETH"), that is the *cap* on deployment, not the risk. Use riskPct=1 and quote the smaller qty; do not reverse-solve riskPct to make qty match the budget. If the user explicitly asked to deploy the whole balance, pass riskPct=100 and surface the `yolo` warning from the tool output.
+
+Required sections of the published plan:
+
+- **Verdict** — "go" with confidence (low / med / high).
+- **Entry** — specific price or condition ("break above X on 4h close").
+- **Stop-loss** — explain what the stop *means* structurally (below which level, why that invalidates the thesis), plus the ATR math so the choice isn't arbitrary.
+- **Take-profit** — first TP at next structural resistance, second optional. Include the resulting R:R.
+- **Position size** — qty and notional from `position_size`. Never quote `balance ÷ entry` instead.
+- **Invalidation** — one line on what would flip the thesis (a daily close below $X, a loss of the BTC ratio support, a funding-rate flush).
+
+If you fetched `volumeSignal` and it was "dry" or "below" on a breakout setup, downgrade the confidence and say so.
+
+## 8. Stand-aside verdict (when bull case doesn't dominate)
+
+This is a valid, complete answer. Do not manufacture a plan to fill the space. Output:
+
+- **Verdict:** stand aside. One sentence on why.
+- **If-then plan for later.** Two or three conditional setups, e.g.:
+  - "If price closes above $X on daily with volume surge → long entry at $Y, stop $Z."
+  - "If it drops to $A (structural support) on weak volume → long value entry at $B, stop $C."
+- **What you would wait to see** — the specific flip conditions. Price? BTC ratio? Funding flush? Regime change? Be concrete.
+
+A good stand-aside output is worth more to the user than a hedged trade plan — it tells them what they're waiting for.
+
+## 9. Backtest (when user asks "does this work" / "what's the historical edge")
 
 - Fetch ≥ 500 candles via `get_ohlcv` on the user's chosen horizon.
-- Pick the preset that matches the user's intent:
-  - `rsi_reversal` — mean-reversion at oversold/overbought extremes
-  - `ma_crossover` — trend-following on SMA cross
-  - `bollinger_mean_reversion` — fade the extremes back to the mean
-  - `donchian_breakout` — range break, Turtle-style
+- Pick the preset that matches intent: `rsi_reversal`, `ma_crossover`, `bollinger_mean_reversion`, `donchian_breakout`.
 - Report the key metrics: total return, CAGR, max DD %, Sharpe, profit factor, win rate, trades, expectancy, avg R, avg bars held, plus the `buyHoldReturnPct` benchmark.
 - Never call a backtest "profitable" based on ≤ 10 trades. Say so explicitly.
-- Results are a single historical path — flag overfitting risk when the parameters are heavily tuned.
+- Results are a single historical path — flag overfitting risk when parameters are heavily tuned.
 
-## 7. Disclose
+## 10. Disclose
 
-End every recommendation with the literal line:
+End every recommendation (go OR stand-aside) with the literal line:
 
 > _This is technical analysis, not financial advice. Crypto is volatile and you can lose money._
 
 ## Rules
 
-- **Never fabricate data.** If a tool fails or returns null for an indicator, say so and stop or revise the plan.
-- **Round honestly.** Round to sensible precision (BTC to 2 decimals, small alts to 4–6). Don't invent decimals you didn't compute.
-- **Prefer confluence.** One signal is weak; two agreeing signals is interesting; three or more is a setup.
-- **Always include a stop.** No trade recommendation without an invalidation level.
-- **Stay in the user's language.** If they wrote in Turkish, reply in Turkish; if English, English.
+- **Never fabricate data.** If a tool fails or returns null, say so explicitly — especially on news. A `filter: 'relaxed'` result from `get_news` means the symbol filter failed, not that there's no bad news; do not assert "no major headlines" from empty results.
+- **Round honestly.** BTC to 2 decimals, small alts to 4–6. Don't invent decimals you didn't compute.
+- **Prefer confluence.** One signal is weak; two agreeing is interesting; three or more is a setup.
+- **Always include a stop** on any go recommendation. No trade recommendation without an invalidation level.
+- **Stay in the user's language.** Turkish in, Turkish out.
