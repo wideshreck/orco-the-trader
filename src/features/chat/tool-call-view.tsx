@@ -166,9 +166,31 @@ function scalar(v: unknown): string {
     return v.toPrecision(4);
   }
   if (typeof v === 'boolean') return String(v);
-  if (Array.isArray(v)) return `[${v.length}]`;
+  if (Array.isArray(v)) return arrayInline(v) ?? `[${v.length}]`;
   if (typeof v === 'object') return '{…}';
   return String(v);
+}
+
+// Short arrays of primitives render as "[BTC,ETH]" instead of the cryptic
+// "[2]". Falls back to the count for long, mixed, or nested arrays so the
+// one-line tool header never overflows.
+function arrayInline(v: unknown[]): string | null {
+  if (v.length === 0) return '[]';
+  if (v.length > 4) return null;
+  const parts: string[] = [];
+  for (const item of v) {
+    if (typeof item === 'string') {
+      if (item.length > 16) return null;
+      parts.push(item);
+    } else if (typeof item === 'number' || typeof item === 'boolean') {
+      parts.push(String(item));
+    } else {
+      return null;
+    }
+  }
+  const joined = parts.join(',');
+  if (joined.length > 40) return null;
+  return `[${joined}]`;
 }
 
 function stringify(value: unknown): string {
