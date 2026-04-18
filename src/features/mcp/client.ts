@@ -62,7 +62,7 @@ export function gateMcpTools(server: ConnectedServer, approver: Approver): ToolS
             input,
           });
           if (decision === 'deny') {
-            throw new Error('denied by user');
+            throw new Error('denied by user — do not retry this tool; ask the user what to do');
           }
         }
         return originalExecute(input, callCtx);

@@ -54,7 +54,10 @@ export function buildAiSdkTools(opts: {
             input: parsed.data,
           });
           if (decision === 'deny') {
-            throw new Error('denied by user');
+            // Message is surfaced to the model as the tool-result error. Keep
+            // it explicit: retrying the same call with the same args will be
+            // denied again, so the model should ask the user instead.
+            throw new Error('denied by user — do not retry this tool; ask the user what to do');
           }
         }
         return t.execute(parsed.data, {
