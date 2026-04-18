@@ -26,7 +26,7 @@ function sessionPath(id: SessionId): string {
 }
 
 function ensureDir(): void {
-  fs.mkdirSync(rootDir(), { recursive: true });
+  fs.mkdirSync(rootDir(), { recursive: true, mode: 0o700 });
 }
 
 export function readIndex(): SessionIndex {
@@ -67,13 +67,13 @@ export function writeIndex(idx: SessionIndex): void {
   const payload: SessionIndex = { v: 1, sessions: sorted };
   const file = indexPath();
   const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(payload, null, 2));
+  fs.writeFileSync(tmp, JSON.stringify(payload, null, 2), { mode: 0o600 });
   fs.renameSync(tmp, file);
 }
 
 export function appendEvent(id: SessionId, ev: SessionEvent): void {
   ensureDir();
-  fs.appendFileSync(sessionPath(id), `${JSON.stringify(ev)}\n`);
+  fs.appendFileSync(sessionPath(id), `${JSON.stringify(ev)}\n`, { mode: 0o600 });
 }
 
 export function loadEvents(id: SessionId): SessionEvent[] {

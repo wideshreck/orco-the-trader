@@ -26,9 +26,12 @@ export function loadWatchlist(): Watchlist {
 
 export function saveWatchlist(wl: Watchlist): void {
   const p = watchlistPath();
-  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.mkdirSync(path.dirname(p), { recursive: true, mode: 0o700 });
   const unique = Array.from(new Set(wl.symbols.map((s) => s.toUpperCase())));
-  fs.writeFileSync(p, JSON.stringify({ symbols: unique.sort() }, null, 2), 'utf8');
+  fs.writeFileSync(p, JSON.stringify({ symbols: unique.sort() }, null, 2), {
+    encoding: 'utf8',
+    mode: 0o600,
+  });
 }
 
 export function addSymbol(sym: string): Watchlist {

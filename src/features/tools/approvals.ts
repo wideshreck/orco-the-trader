@@ -33,10 +33,10 @@ function read(): Persisted {
 }
 
 function write(data: Persisted): void {
-  fs.mkdirSync(approvalsDir(), { recursive: true });
+  fs.mkdirSync(approvalsDir(), { recursive: true, mode: 0o700 });
   const file = approvalsPath();
   const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), { mode: 0o600 });
   fs.renameSync(tmp, file);
 }
 

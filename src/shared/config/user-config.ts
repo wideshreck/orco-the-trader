@@ -90,9 +90,9 @@ export function loadConfig(): Config {
 }
 
 export function saveConfig(config: Config): void {
-  fs.mkdirSync(configDir(), { recursive: true });
+  fs.mkdirSync(configDir(), { recursive: true, mode: 0o700 });
   const file = configPath();
   const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(config, null, 2));
+  fs.writeFileSync(tmp, JSON.stringify(config, null, 2), { mode: 0o600 });
   fs.renameSync(tmp, file);
 }
