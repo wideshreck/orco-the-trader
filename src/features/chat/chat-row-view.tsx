@@ -28,7 +28,16 @@ export function ChatRowView(props: {
         <Text color="red">{stripAnsi(row.content)}</Text>
       ) : row.kind === 'assistant' ? (
         row.content ? (
-          <Text>{renderMarkdown(row.content)}</Text>
+          // Streaming assistant row: `thinking` is true while content is being
+          // appended token-by-token. Skip the full markdown parse on every
+          // delta — it's O(content²) over the stream and the heaviest thing
+          // in the hot path. Plain stripAnsi'd text renders instantly; the
+          // row re-renders with full markdown once it moves to scrollback.
+          thinking ? (
+            <Text>{stripAnsi(row.content)}</Text>
+          ) : (
+            <Text>{renderMarkdown(row.content)}</Text>
+          )
         ) : thinking ? (
           <ThinkingIndicator />
         ) : null
