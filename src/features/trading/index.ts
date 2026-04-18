@@ -14,6 +14,7 @@ import { listTopSymbols } from './tools/list-top-symbols.js';
 import { multiTimeframeAnalysis } from './tools/multi-tf.js';
 import { positionSize } from './tools/position-size.js';
 import { scanMarket } from './tools/scan-market.js';
+import { seasonality } from './tools/seasonality.js';
 import { validateTradePlan } from './tools/validate-trade-plan.js';
 
 let bootstrapped = false;
@@ -38,6 +39,7 @@ export function bootstrapTrading(): void {
   register(fullAnalysis);
   register(validateTradePlan);
   register(correlateAssets);
+  register(seasonality);
 }
 
 export type { Candle } from './tools/get-ohlcv.js';
