@@ -1,6 +1,19 @@
 import { z } from 'zod';
 import { defineTool } from '../../tools/define.js';
 
+export type RiskBand = 'conservative' | 'standard' | 'aggressive' | 'yolo';
+
+// Classify what riskPct actually means for the trader. "Reverse-solved to
+// fit the budget" attacks on the authority rule almost always land in the
+// aggressive/yolo bands, so flagging them gives the LLM a signal to
+// surface instead of quietly accepting.
+export function classifyRisk(pct: number): RiskBand {
+  if (pct <= 1) return 'conservative';
+  if (pct <= 2) return 'standard';
+  if (pct <= 5) return 'aggressive';
+  return 'yolo';
+}
+
 export const positionSize = defineTool({
   name: 'position_size',
   description: [
@@ -29,7 +42,13 @@ export const positionSize = defineTool({
     'Returns: riskAmount (USDT, = balance × riskPct / 100), stopDistance',
     '(abs + %), qty (base asset — USE THIS), notional (USDT, = qty × entry),',
     'marginRequired (notional / leverage), rr (if TP given), rewardAmount,',
-    'takeProfitAtR (price giving R:R=1).',
+    'takeProfitAtR (price giving R:R=1), riskBand (conservative ≤1% |',
+    'standard ≤2% | aggressive ≤5% | yolo >5%), and `warning` text when',
+    'the band is aggressive or yolo. MUST surface the warning verbatim in',
+    'the user-facing response when present — do not quietly pass through',
+    'a 10%+ trade just because the LLM reverse-solved riskPct to match a',
+    'requested notional. If you did reverse-solve, re-call with riskPct=1',
+    'and quote the smaller qty.',
   ].join('\n'),
   permission: 'auto',
   inputSchema: z.object({
@@ -70,6 +89,13 @@ export const positionSize = defineTool({
       rr = reward / stopDistance;
       rewardAmount = qty * reward;
     }
+    const riskBand = classifyRisk(riskPct);
+    const warning =
+      riskBand === 'yolo'
+        ? `YOLO risk: ${riskPct.toFixed(1)}% on a single trade. Standard practice is 0.5–2%. Confirm the user really wants to deploy this much before quoting the qty.`
+        : riskBand === 'aggressive'
+          ? `Aggressive risk: ${riskPct.toFixed(1)}% per trade (typical is 0.5–2%). Call this out to the user.`
+          : null;
     return {
       side,
       leverage,
@@ -87,6 +113,8 @@ export const positionSize = defineTool({
       takeProfitAtR,
       rr,
       rewardAmount,
+      riskBand,
+      warning,
     };
   },
 });

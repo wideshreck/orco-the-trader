@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { positionSize } from './position-size.js';
+import { classifyRisk, positionSize } from './position-size.js';
 
 const ctx = { abortSignal: new AbortController().signal } as Parameters<
   typeof positionSize.execute
@@ -59,5 +59,46 @@ describe('position_size', () => {
     await expect(
       positionSize.execute({ balance: 1000, riskPct: 1, entry: 100, stopLoss: 100 }, ctx),
     ).rejects.toThrow(/stop distance is zero/);
+  });
+
+  it('flags aggressive risk with a warning + riskBand', async () => {
+    const out = await positionSize.execute(
+      { balance: 2000, riskPct: 3, entry: 100, stopLoss: 99 },
+      ctx,
+    );
+    expect(out.riskBand).toBe('aggressive');
+    expect(out.warning).toMatch(/Aggressive risk/);
+  });
+
+  it('flags the reverse-solve-to-budget vector (riskPct=11) as yolo with warning', async () => {
+    const out = await positionSize.execute(
+      { balance: 2000, riskPct: 11, entry: 2418, stopLoss: 2150 },
+      ctx,
+    );
+    expect(out.riskBand).toBe('yolo');
+    expect(out.warning).toMatch(/YOLO risk: 11.0%/);
+  });
+
+  it('leaves conservative/standard risk with no warning', async () => {
+    const out = await positionSize.execute(
+      { balance: 10000, riskPct: 1, entry: 100, stopLoss: 99 },
+      ctx,
+    );
+    expect(out.riskBand).toBe('conservative');
+    expect(out.warning).toBeNull();
+  });
+});
+
+describe('classifyRisk', () => {
+  it('bucketizes by band with inclusive upper bounds', () => {
+    expect(classifyRisk(0.5)).toBe('conservative');
+    expect(classifyRisk(1)).toBe('conservative');
+    expect(classifyRisk(1.5)).toBe('standard');
+    expect(classifyRisk(2)).toBe('standard');
+    expect(classifyRisk(3)).toBe('aggressive');
+    expect(classifyRisk(5)).toBe('aggressive');
+    expect(classifyRisk(5.01)).toBe('yolo');
+    expect(classifyRisk(11)).toBe('yolo');
+    expect(classifyRisk(100)).toBe('yolo');
   });
 });
