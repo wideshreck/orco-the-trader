@@ -104,19 +104,23 @@ export function handleTurnError(
 }
 
 // On stream end: promote any tool rows still 'pending' or 'awaiting-approval'
-// (Ctrl+C mid-call) to 'error' so they don't commit as zombies, then handle
-// the trailing empty assistant row based on what came before:
+// (Ctrl+C mid-call) to 'error' so they don't commit as zombies, then dedupe
+// any "restart prefix" assistant rows (some models re-emit their intro text
+// after tool results instead of continuing — we drop the earlier duplicate
+// so the scrollback doesn't show the same paragraph twice), and finally
+// handle the trailing empty assistant row based on what came before:
 //   - any tool row present → drop the trailer silently (it was the step
 //     container after a successful tool chain that ended without commentary)
 //   - nothing else produced → flag a red "(empty response)" so the user
 //     doesn't stare at a vanished turn wondering if the model hung up
 export function finalizeLive(current: ChatRow[]): ChatRow[] {
-  const finalized: ChatRow[] = current.map((r) => {
+  const promoted: ChatRow[] = current.map((r) => {
     if (r.kind === 'tool' && (r.status === 'pending' || r.status === 'awaiting-approval')) {
       return { ...r, status: 'error', error: r.error ?? '(canceled)' };
     }
     return r;
   });
+  const finalized = dedupeAssistantPrefixRestarts(promoted);
   if (finalized.length === 0) return finalized;
   const last = finalized[finalized.length - 1];
   const isEmptyTrailingAssistant =
@@ -145,4 +149,45 @@ export function maxIdOf(rows: ChatRow[]): number {
   let m = 0;
   for (const r of rows) if (r.id > m) m = r.id;
   return m;
+}
+
+// When a model restarts generation after tool results, it often re-emits the
+// opening framing. Each restart lands on a different assistant row (tool-call
+// events advance activeAssistantId), so we end up with two rows where the
+// later one's content starts with the earlier one's content — the user sees
+// the same intro rendered twice. Drop any earlier assistant row whose full
+// content is a strict prefix of a later assistant row's content.
+export function dedupeAssistantPrefixRestarts(rows: ChatRow[]): ChatRow[] {
+  const contentIdxs: number[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (r?.kind === 'assistant' && r.content && !r.error) contentIdxs.push(i);
+  }
+  if (contentIdxs.length < 2) return rows;
+  const toDrop = new Set<number>();
+  for (let i = 0; i < contentIdxs.length - 1; i++) {
+    const earlierIdx = contentIdxs[i];
+    if (earlierIdx === undefined) continue;
+    const earlier = rows[earlierIdx];
+    if (!earlier || earlier.kind !== 'assistant') continue;
+    const earlierContent = earlier.content;
+    // A two-word false match would be a bad drop; require a meaningful
+    // chunk of shared opening before calling it a restart.
+    if (earlierContent.length < 40) continue;
+    for (let j = i + 1; j < contentIdxs.length; j++) {
+      const laterIdx = contentIdxs[j];
+      if (laterIdx === undefined) continue;
+      const later = rows[laterIdx];
+      if (!later || later.kind !== 'assistant') continue;
+      if (
+        later.content.length > earlierContent.length &&
+        later.content.startsWith(earlierContent)
+      ) {
+        toDrop.add(earlierIdx);
+        break;
+      }
+    }
+  }
+  if (toDrop.size === 0) return rows;
+  return rows.filter((_, i) => !toDrop.has(i));
 }
