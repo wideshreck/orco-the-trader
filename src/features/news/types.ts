@@ -15,5 +15,10 @@ export type NewsResult = {
   articles: NewsArticle[];
   count: number;
   provider: NewsProvider;
+  // 'strict' — symbol filter returned at least one match.
+  // 'relaxed' — no strict match, falling back to unfiltered recent headlines
+  //   so the caller sees what's in the feed instead of a misleading 0.
+  // 'none' — no symbol filter was requested.
+  filter: 'strict' | 'relaxed' | 'none';
   fetchedAt: string;
 };
