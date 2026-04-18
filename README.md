@@ -30,10 +30,12 @@ Ask Orco to analyze a coin, backtest a strategy, or size a position — it calls
 
 ### What's new in v0.2
 
-- **Live data** — `get_news`, `get_defi_tvl`, `get_gas_price`, `correlate_assets`, `seasonality`
-- **UX overhaul** — braille spinner + elapsed counter, ASCII context bar `[████░░░░] 42%`, approval countdown with expand, queue preview, bootstrap progressive status ("still trying…" → "network issue?"), MCP ready/connecting/failed pill
-- **Hardening** — 0o600 perms on config/auth/session files, 120s approval auto-deny, 10s catalog fetch timeout, property-by-property JSON validation, ANSI escape scrubbing on model output
-- **Agent reliability** — denied tool errors now include retry guidance (breaks model loops), step limit raised to 40 for long MCP chains, empty responses surface a red marker instead of vanishing
+- **Live data** — `get_news`, `get_defi_tvl`, `get_gas_price`, `correlate_assets`, `relative_strength`, `seasonality`
+- **Agent discipline** — base prompt now mandates timeframe discipline (≥300 daily bars for swing reads), stand-aside as a first-class answer, and a coupling-vs-leadership check. `trade_analysis` skill rewritten to require bull + bear cases before any plan. Position-size authoritative with `riskBand` warning blocking covert YOLO sizing.
+- **Breakout qualification** — `volumeSignal` on `compute_indicators` (surge / above / normal / below / dry) so thin-volume breakouts don't get recommended unqualified.
+- **UX overhaul** — braille spinner + elapsed counter, ASCII context bar `[████░░░░] 42%`, approval countdown with expand, queue preview, bootstrap progressive status, MCP ready/connecting/failed pill, progressive thinking indicator ("processing results" → "still synthesising" → "ctrl+c helps"), long-paste viewport clipping in the input, tool-call rows inline short arrays.
+- **Hardening** — 0o600 perms on config/auth/session files, 120s approval auto-deny, 10s catalog fetch timeout, property-by-property JSON validation, ANSI escape scrubbing on model output, news "relaxed" filter flag so empty results don't become "no bad news" hallucinations.
+- **Perf** — streaming assistant rows skip the markdown parse (renders once on commit to scrollback), `marked-terminal` parser cached by width. Base prompt pushes composite-first tool use and step-level parallelism so typical turns batch 3–4 big tool calls instead of 15 sequential ones.
 
 ---
 
@@ -82,15 +84,16 @@ Orco speaks your language — English, Turkish, or anything in between.
 
 **Market analysis**
 - OHLCV, 24h ticker, order book, funding rate, open interest, long/short ratio
-- 9 indicators: SMA, EMA, RSI (Wilder), MACD, ATR, Bollinger Bands, Stochastic, VWAP, ADX
+- 9 indicators: SMA, EMA, RSI (Wilder), MACD, ATR, Bollinger Bands, Stochastic, VWAP, ADX — plus a breakout-qualifying `volumeSignal` (surge / above / normal / below / dry) on the latest bar
 - Support/resistance detection via fractal pivots + price clustering
 - RSI and MACD divergence detection (bullish + bearish)
 - Multi-timeframe confluence with alignment scoring
 - Market regime (Fear & Greed, BTC / ETH dominance, global mcap)
 - Top-movers scanner, parallel per-symbol digest
-- Position-size calculator (balance + risk% → qty, margin, R:R)
+- Position-size calculator (balance + risk% → qty, margin, R:R) with `riskBand` + warning output blocking covert YOLO sizing
 - Trade-plan validator (wrong-side stop, sub-RR, ATR misalignment, chasing)
 - Pairwise Pearson correlation of log returns (2–8 symbols)
+- Relative strength vs. a benchmark (log-ratio trend + 30d/90d deltas) — distinguishes "coupled with BTC" from "leading BTC"
 - Day-of-week / hour-of-day return distribution (seasonality)
 
 **Live context**
@@ -107,7 +110,7 @@ Orco speaks your language — English, Turkish, or anything in between.
 - Parameter sweep: grid-search 1–4 params, top-30 by Sharpe + best by return / PF, <5-trade rows auto-excluded
 
 **Quality**
-- 239 unit tests with `bun:test`
+- 271 unit tests with `bun:test`
 - Strict TypeScript, Biome lint + format, CI on every push
 - Feature-first architecture; each file stays under ~300 lines
 
@@ -136,6 +139,7 @@ Orco speaks your language — English, Turkish, or anything in between.
 | `backtest` | Event-driven simulation with 4 presets and full metrics |
 | `sweep_backtest` | Grid-search parameter sweep: 1–4 ranges, top-30 by Sharpe + best by return/PF |
 | `correlate_assets` | Pairwise Pearson correlation of log returns, 2–8 symbols, with alignment-length reporting |
+| `relative_strength` | Symbol vs. benchmark ratio trajectory: 30d/90d change + trend label (rising/flat/falling). Distinguishes "coupled with BTC" from "leading BTC" |
 | `seasonality` | Weekday / hour-of-day return distribution — avg, median, win rate, std-dev per bucket |
 | `get_news` | Crypto headlines via CryptoCompare (600+ sources) with RSS fallback, filters by symbol / category / since |
 | `get_defi_tvl` | DefiLlama TVL + 7d/30d % change — by protocol, by chain, or top-N ranking |

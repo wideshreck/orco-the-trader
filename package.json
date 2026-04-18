@@ -1,7 +1,7 @@
 {
   "name": "orco-the-trader",
   "version": "0.1.0",
-  "description": "Terminal-native AI trading assistant for crypto — multi-provider LLMs, 27 native tools, live news + DeFi data, event-driven backtesting, MCP support",
+  "description": "Terminal-native AI trading assistant for crypto — multi-provider LLMs, 28 native tools, live news + DeFi data, relative-strength + volume signals, event-driven backtesting, MCP support",
   "type": "module",
   "bin": {
     "orco": "dist/cli/main.js"
