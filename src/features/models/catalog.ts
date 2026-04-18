@@ -55,10 +55,53 @@ function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
+function parseModalities(raw: unknown): ModelModalities | undefined {
+  if (!isObject(raw)) return undefined;
+  const input = Array.isArray(raw.input)
+    ? raw.input.filter((v): v is string => typeof v === 'string')
+    : [];
+  const output = Array.isArray(raw.output)
+    ? raw.output.filter((v): v is string => typeof v === 'string')
+    : [];
+  return { input, output };
+}
+
+function parseCost(raw: unknown): ModelCost | undefined {
+  if (!isObject(raw)) return undefined;
+  const out: ModelCost = {};
+  if (typeof raw.input === 'number') out.input = raw.input;
+  if (typeof raw.output === 'number') out.output = raw.output;
+  if (typeof raw.cache_read === 'number') out.cache_read = raw.cache_read;
+  if (typeof raw.cache_write === 'number') out.cache_write = raw.cache_write;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function parseLimit(raw: unknown): ModelLimit | undefined {
+  if (!isObject(raw)) return undefined;
+  const out: ModelLimit = {};
+  if (typeof raw.context === 'number') out.context = raw.context;
+  if (typeof raw.output === 'number') out.output = raw.output;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 function parseModel(raw: unknown): CatalogModel | null {
   if (!isObject(raw)) return null;
   if (typeof raw.id !== 'string' || typeof raw.name !== 'string') return null;
-  return raw as unknown as CatalogModel;
+  const out: CatalogModel = { id: raw.id, name: raw.name };
+  if (typeof raw.attachment === 'boolean') out.attachment = raw.attachment;
+  if (typeof raw.reasoning === 'boolean') out.reasoning = raw.reasoning;
+  if (typeof raw.tool_call === 'boolean') out.tool_call = raw.tool_call;
+  if (typeof raw.temperature === 'boolean') out.temperature = raw.temperature;
+  if (typeof raw.knowledge === 'string') out.knowledge = raw.knowledge;
+  if (typeof raw.release_date === 'string') out.release_date = raw.release_date;
+  if (typeof raw.open_weights === 'boolean') out.open_weights = raw.open_weights;
+  const modalities = parseModalities(raw.modalities);
+  if (modalities) out.modalities = modalities;
+  const cost = parseCost(raw.cost);
+  if (cost) out.cost = cost;
+  const limit = parseLimit(raw.limit);
+  if (limit) out.limit = limit;
+  return out;
 }
 
 function parseProvider(raw: unknown): CatalogProvider | null {
@@ -67,12 +110,16 @@ function parseProvider(raw: unknown): CatalogProvider | null {
     return null;
   }
   if (!isObject(raw.models)) return null;
+  const env = raw.env.filter((v): v is string => typeof v === 'string');
   const models: Record<string, CatalogModel> = {};
   for (const [k, v] of Object.entries(raw.models)) {
     const m = parseModel(v);
     if (m) models[k] = m;
   }
-  return { ...(raw as unknown as CatalogProvider), models };
+  const out: CatalogProvider = { id: raw.id, name: raw.name, env, models };
+  if (typeof raw.npm === 'string') out.npm = raw.npm;
+  if (typeof raw.doc === 'string') out.doc = raw.doc;
+  return out;
 }
 
 export function parseCatalog(raw: unknown): Catalog {
@@ -106,11 +153,28 @@ function writeCache(data: Catalog): void {
   fs.renameSync(tmp, file);
 }
 
+const FETCH_TIMEOUT_MS = 10_000;
+
 async function fetchCatalog(signal?: AbortSignal): Promise<Catalog> {
-  const res = await fetch(CATALOG_URL, signal ? { signal } : undefined);
-  if (!res.ok) throw new Error(`models.dev ${res.status}`);
-  const raw = (await res.json()) as unknown;
-  return parseCatalog(raw);
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(new Error('catalog fetch timeout')),
+    FETCH_TIMEOUT_MS,
+  );
+  const onOuterAbort = () => controller.abort(signal?.reason);
+  if (signal) {
+    if (signal.aborted) controller.abort(signal.reason);
+    else signal.addEventListener('abort', onOuterAbort, { once: true });
+  }
+  try {
+    const res = await fetch(CATALOG_URL, { signal: controller.signal });
+    if (!res.ok) throw new Error(`models.dev ${res.status}`);
+    const raw = (await res.json()) as unknown;
+    return parseCatalog(raw);
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener('abort', onOuterAbort);
+  }
 }
 
 export type LoadResult = { catalog: Catalog; stale: boolean; fromCache: boolean };
