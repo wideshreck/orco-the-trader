@@ -21,9 +21,19 @@ Ask Orco to analyze a coin, backtest a strategy, or size a position — it calls
 | Support / resistance | Eyeballs a chart it can't see | Fractal pivot detection + price clustering with touch counts |
 | Backtesting | "Historically this strategy tends to..." | Event-driven engine, 4 presets, no look-ahead, fee + slippage, Sharpe / PF / max DD |
 | Position sizing | "Risk 1-2% of your account" | `balance × riskPct / stopDistance` → exact qty, notional, R:R |
+| News & context | Stale training data | Live headlines (CryptoCompare + RSS), DeFi TVL, EVM gas, correlations, seasonality |
 | Audit trail | None — output is a monologue | Every number links to a tool call you can inspect |
 | Provider lock-in | OpenAI only | Anthropic, OpenAI, Google, Groq, xAI, OpenRouter, Ollama |
 | Extensibility | Plugins, maybe | MCP (HTTP + STDIO) + drop-in skill files |
+
+---
+
+### What's new in v0.2
+
+- **Live data** — `get_news`, `get_defi_tvl`, `get_gas_price`, `correlate_assets`, `seasonality`
+- **UX overhaul** — braille spinner + elapsed counter, ASCII context bar `[████░░░░] 42%`, approval countdown with expand, queue preview, bootstrap progressive status ("still trying…" → "network issue?"), MCP ready/connecting/failed pill
+- **Hardening** — 0o600 perms on config/auth/session files, 120s approval auto-deny, 10s catalog fetch timeout, property-by-property JSON validation, ANSI escape scrubbing on model output
+- **Agent reliability** — denied tool errors now include retry guidance (breaks model loops), step limit raised to 40 for long MCP chains, empty responses surface a red marker instead of vanishing
 
 ---
 
@@ -80,6 +90,13 @@ Orco speaks your language — English, Turkish, or anything in between.
 - Top-movers scanner, parallel per-symbol digest
 - Position-size calculator (balance + risk% → qty, margin, R:R)
 - Trade-plan validator (wrong-side stop, sub-RR, ATR misalignment, chasing)
+- Pairwise Pearson correlation of log returns (2–8 symbols)
+- Day-of-week / hour-of-day return distribution (seasonality)
+
+**Live context**
+- Crypto news headlines — CryptoCompare aggregator (600+ sources) with RSS fallback (CoinDesk, CoinTelegraph, Decrypt, The Block, Bitcoin Magazine)
+- DeFi TVL (protocol / chain / top-N) via DefiLlama — no auth
+- Gas price + EIP-1559 base fee for 6 EVM chains (eth, arbitrum, optimism, base, polygon, bsc)
 
 **Backtesting**
 - Event-driven engine, no look-ahead bias (signals on close of bar *i*, fills on open of bar *i+1*)
@@ -90,7 +107,7 @@ Orco speaks your language — English, Turkish, or anything in between.
 - Parameter sweep: grid-search 1–4 params, top-30 by Sharpe + best by return / PF, <5-trade rows auto-excluded
 
 **Quality**
-- 206 unit tests with `bun:test`
+- 239 unit tests with `bun:test`
 - Strict TypeScript, Biome lint + format, CI on every push
 - Feature-first architecture; each file stays under ~300 lines
 
@@ -118,6 +135,11 @@ Orco speaks your language — English, Turkish, or anything in between.
 | `position_size` | Risk-based qty sizing with optional take-profit and leverage |
 | `backtest` | Event-driven simulation with 4 presets and full metrics |
 | `sweep_backtest` | Grid-search parameter sweep: 1–4 ranges, top-30 by Sharpe + best by return/PF |
+| `correlate_assets` | Pairwise Pearson correlation of log returns, 2–8 symbols, with alignment-length reporting |
+| `seasonality` | Weekday / hour-of-day return distribution — avg, median, win rate, std-dev per bucket |
+| `get_news` | Crypto headlines via CryptoCompare (600+ sources) with RSS fallback, filters by symbol / category / since |
+| `get_defi_tvl` | DefiLlama TVL + 7d/30d % change — by protocol, by chain, or top-N ranking |
+| `get_gas_price` | Current gas + EIP-1559 base fee for 6 EVM chains via LlamaRPC (no auth) |
 | `watchlist` | Persistent symbol list (list / add / remove / clear) |
 | `ask_user` | LLM pauses to ask the user a scoped question |
 | `todo_write` | LLM-managed task list rendered live in the chat |
@@ -166,6 +188,7 @@ Models are discovered dynamically from [models.dev](https://models.dev) and cach
 | `/tools` | list registered tools and their permission tier |
 | `/skills` | list installed skills |
 | `/mcp` | list configured MCP servers and their status |
+| `/mcp reload` | reconnect all MCP servers |
 | `/watchlist` | show saved symbols |
 | `/prompt` | show the active base + user system prompts |
 | `/config` | config file location and current values |
@@ -173,7 +196,7 @@ Models are discovered dynamically from [models.dev](https://models.dev) and cach
 | `/help` | all commands |
 | `/exit` | quit |
 
-Keybindings: `Shift+Enter` or trailing `\` inserts a newline · `↑/↓` walks input history · `Ctrl+C` cancels the in-flight stream · second `Ctrl+C` quits.
+Keybindings: `Shift+Enter` or trailing `\` inserts a newline · `↑/↓` walks input history · `Ctrl+C` cancels the in-flight stream · second `Ctrl+C` quits · during an approval prompt: `a` allow once, `d` deny, `A` always allow, `e` toggle full-JSON detail, `esc` deny.
 
 ---
 
@@ -192,7 +215,7 @@ Detailed playbook: tools to call, thresholds to check, output shape.
 
 Place the file at `~/.config/orco/skills/my_strategy/SKILL.md` (or `.../my_strategy.md`).
 
-Orco ships with 7 built-in skills:
+Orco ships with 8 built-in skills (loaded from the bundled `dist/` layout; user skills in `~/.config/orco/skills/` override same-name built-ins):
 
 | Skill | Trigger |
 |---|---|
@@ -203,6 +226,7 @@ Orco ships with 7 built-in skills:
 | `risk_first` | Position sizing, "how much should I buy?" |
 | `common_mistakes` | Background awareness: no-stop, chasing, revenge trading, size creep |
 | `post_trade_review` | "I got stopped out" — structured debrief with tape reconstruction |
+| `news_impact` | Did a headline move the price? Catalyst-vs-price reads, "is this priced in?" |
 
 ---
 
@@ -295,8 +319,11 @@ See [`CLAUDE.md`](./CLAUDE.md) for the contributor style guide (kept intentional
 
 ## Roadmap
 
-- [x] Specialized skills (breakout, mean-reversion, divergence, risk-first, mistakes, post-trade review)
+- [x] Specialized skills (breakout, mean-reversion, divergence, risk-first, mistakes, post-trade review, news impact)
 - [x] Parameter-sweep backtests
+- [x] Live news feed (CryptoCompare + RSS)
+- [x] DeFi TVL + EVM gas tracker
+- [x] Correlation + seasonality analysis
 - [ ] Walk-forward (IS/OOS) backtest split
 - [ ] Background alert watcher (price / indicator triggers with notification)
 - [ ] Paper trading (simulated positions, persistent PnL)
