@@ -1,33 +1,8 @@
 import { z } from 'zod';
 import { defineTool } from '../../tools/define.js';
+import { type Candle, fetchKlines, INTERVALS } from '../binance.js';
 
-const INTERVALS = ['1m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '12h', '1d', '1w'] as const;
-
-export type Candle = {
-  t: number; // open time (ms since epoch)
-  o: number;
-  h: number;
-  l: number;
-  c: number;
-  v: number;
-};
-
-function parseKlines(raw: unknown): Candle[] {
-  if (!Array.isArray(raw)) return [];
-  const out: Candle[] = [];
-  for (const row of raw) {
-    if (!Array.isArray(row) || row.length < 6) continue;
-    const t = Number(row[0]);
-    const o = Number(row[1]);
-    const h = Number(row[2]);
-    const l = Number(row[3]);
-    const c = Number(row[4]);
-    const v = Number(row[5]);
-    if (!Number.isFinite(t + o + h + l + c + v)) continue;
-    out.push({ t, o, h, l, c, v });
-  }
-  return out;
-}
+export type { Candle } from '../binance.js';
 
 export const getOhlcv = defineTool({
   name: 'get_ohlcv',
@@ -59,14 +34,12 @@ export const getOhlcv = defineTool({
   async execute(input, ctx) {
     const limit = input.limit ?? 100;
     const symbol = input.symbol.toUpperCase();
-    const url = `https://api.binance.com/api/v3/klines?symbol=${encodeURIComponent(symbol)}&interval=${input.interval}&limit=${limit}`;
-    const res = await fetch(url, { signal: ctx.abortSignal });
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      throw new Error(`binance ${res.status}: ${body.slice(0, 200)}`);
-    }
-    const raw = (await res.json()) as unknown;
-    const candles = parseKlines(raw);
+    const candles: Candle[] = await fetchKlines({
+      symbol,
+      interval: input.interval,
+      limit,
+      signal: ctx.abortSignal,
+    });
     if (candles.length === 0) {
       throw new Error(`no candles returned for ${symbol} ${input.interval}`);
     }

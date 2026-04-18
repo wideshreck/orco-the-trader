@@ -1,5 +1,6 @@
 import { register } from '../tools/registry.js';
 import { computeIndicators } from './tools/compute-indicators.js';
+import { correlateAssets } from './tools/correlate-assets.js';
 import { detectDivergence } from './tools/detect-divergence.js';
 import { detectSupportResistance } from './tools/detect-sr.js';
 import { fullAnalysis } from './tools/full-analysis.js';
@@ -36,6 +37,7 @@ export function bootstrapTrading(): void {
   register(detectDivergence);
   register(fullAnalysis);
   register(validateTradePlan);
+  register(correlateAssets);
 }
 
 export type { Candle } from './tools/get-ohlcv.js';
