@@ -13,6 +13,7 @@ import { getTicker24h } from './tools/get-ticker-24h.js';
 import { listTopSymbols } from './tools/list-top-symbols.js';
 import { multiTimeframeAnalysis } from './tools/multi-tf.js';
 import { positionSize } from './tools/position-size.js';
+import { relativeStrength } from './tools/relative-strength.js';
 import { scanMarket } from './tools/scan-market.js';
 import { seasonality } from './tools/seasonality.js';
 import { validateTradePlan } from './tools/validate-trade-plan.js';
@@ -40,6 +41,7 @@ export function bootstrapTrading(): void {
   register(validateTradePlan);
   register(correlateAssets);
   register(seasonality);
+  register(relativeStrength);
 }
 
 export type { Candle } from './tools/get-ohlcv.js';
