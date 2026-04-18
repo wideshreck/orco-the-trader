@@ -1,9 +1,19 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { Skill, SkillMeta } from './types.js';
 
-const SKILLS_DIR = path.join(os.homedir(), '.config', 'orco', 'skills');
+const USER_SKILLS_DIR = path.join(os.homedir(), '.config', 'orco', 'skills');
+
+// Built-in playbooks live next to this file's compiled location, under
+// ../trading/skills/. We resolve via import.meta.url so both bun-run-from-
+// source and the tsc-built dist/ layout find them. The build step copies
+// the .md files from src/ into dist/ so this stays valid post-compile.
+function builtinSkillsDir(): string {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  return path.resolve(here, '..', 'trading', 'skills');
+}
 
 const FRONTMATTER_RE = /^---\s*\n([\s\S]+?)\n---\s*\n?([\s\S]*)$/;
 
@@ -43,16 +53,16 @@ function readSkillFile(filePath: string): Skill | null {
   return { name, description, path: filePath, body: parsed.body };
 }
 
-function listSkillFiles(): string[] {
+function listSkillFilesIn(dir: string): string[] {
   try {
-    const entries = fs.readdirSync(SKILLS_DIR, { withFileTypes: true });
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
     const out: string[] = [];
     for (const entry of entries) {
       if (entry.isDirectory()) {
-        const inner = path.join(SKILLS_DIR, entry.name, 'SKILL.md');
+        const inner = path.join(dir, entry.name, 'SKILL.md');
         if (fs.existsSync(inner)) out.push(inner);
       } else if (entry.isFile() && entry.name.endsWith('.md')) {
-        out.push(path.join(SKILLS_DIR, entry.name));
+        out.push(path.join(dir, entry.name));
       }
     }
     return out;
@@ -66,9 +76,14 @@ let cache: Map<string, Skill> | null = null;
 function loadAll(): Map<string, Skill> {
   if (cache) return cache;
   const map = new Map<string, Skill>();
-  for (const filePath of listSkillFiles()) {
+  // Built-ins first; user skills with the same name override them.
+  for (const filePath of listSkillFilesIn(builtinSkillsDir())) {
     const skill = readSkillFile(filePath);
     if (skill && !map.has(skill.name)) map.set(skill.name, skill);
+  }
+  for (const filePath of listSkillFilesIn(USER_SKILLS_DIR)) {
+    const skill = readSkillFile(filePath);
+    if (skill) map.set(skill.name, skill);
   }
   cache = map;
   return map;
@@ -91,5 +106,5 @@ export function reloadSkills(): void {
 }
 
 export function skillsDir(): string {
-  return SKILLS_DIR;
+  return USER_SKILLS_DIR;
 }

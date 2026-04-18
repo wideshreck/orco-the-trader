@@ -27,7 +27,7 @@
   ],
   "license": "Apache-2.0",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-skills.mjs",
     "dev": "bun src/cli/main.tsx",
     "start": "bun dist/cli/main.js",
     "compile": "bun build --compile --minify --target=bun-linux-x64 src/cli/main.tsx --outfile dist/orco",
@@ -38,7 +38,7 @@
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
     "check": "biome check . && tsc --noEmit && bun test",
-    "prepublishOnly": "tsc"
+    "prepublishOnly": "npm run build"
   },
   "engines": {
     "bun": ">=1.3",
