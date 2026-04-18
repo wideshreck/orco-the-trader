@@ -3,6 +3,54 @@ import { defineTool } from '../../tools/define.js';
 import type { Candle } from './get-ohlcv.js';
 import { adx, atr, bollinger, ema, macd, rsi, sma, stochastic, vwap } from './indicators.js';
 
+export type VolumeSignal = {
+  last: number;
+  avg20: number | null;
+  ratio: number | null;
+  classification: 'dry' | 'below' | 'normal' | 'above' | 'surge' | 'insufficient';
+};
+
+// A breakout without volume is a fake-out; a dump on thin volume is a shake.
+// This surfaces the most-recent bar's volume vs the rolling 20-bar average
+// so the LLM has a *signal*, not just a raw number, to reason about.
+//
+// Classes calibrated against typical crypto tape:
+//   >2.0× average → 'surge'   (conviction move, breakouts worth trusting)
+//   1.3–2.0×      → 'above'   (elevated interest)
+//   0.7–1.3×      → 'normal'
+//   0.4–0.7×      → 'below'   (apathy, breakouts here are suspicious)
+//   <0.4×         → 'dry'     (shake-out territory)
+export function computeVolumeSignal(candles: Candle[]): VolumeSignal {
+  const last = candles[candles.length - 1];
+  if (!last) {
+    return { last: 0, avg20: null, ratio: null, classification: 'insufficient' };
+  }
+  if (candles.length < 21) {
+    return { last: last.v, avg20: null, ratio: null, classification: 'insufficient' };
+  }
+  // 20-bar average of the bars *before* the latest, so the current bar
+  // doesn't dilute its own comparison.
+  const window = candles.slice(-21, -1);
+  let sum = 0;
+  for (const c of window) sum += c.v;
+  const avg20 = sum / window.length;
+  if (avg20 <= 0) {
+    return { last: last.v, avg20, ratio: null, classification: 'insufficient' };
+  }
+  const ratio = last.v / avg20;
+  const classification: VolumeSignal['classification'] =
+    ratio >= 2
+      ? 'surge'
+      : ratio >= 1.3
+        ? 'above'
+        : ratio >= 0.7
+          ? 'normal'
+          : ratio >= 0.4
+            ? 'below'
+            : 'dry';
+  return { last: last.v, avg20, ratio, classification };
+}
+
 const indicatorName = z.enum([
   'sma20',
   'sma50',
@@ -46,6 +94,13 @@ export const computeIndicators = defineTool({
     '',
     'Returns null for any indicator that requires more history than the series',
     'provides. Always evaluate null before citing a number.',
+    '',
+    "Also returns `volumeSignal` — the latest bar's volume vs its 20-bar",
+    'average with a classification (surge / above / normal / below / dry).',
+    'Use this to qualify breakout / breakdown calls: a resistance break on',
+    '"dry" or "below" volume is low-confidence and frequently reverses;',
+    'the same break on "surge" carries conviction. Do not recommend a',
+    'breakout trade without checking this field.',
   ].join('\n'),
   permission: 'auto',
   inputSchema: z.object({
@@ -99,6 +154,7 @@ export const computeIndicators = defineTool({
     return {
       last: last ? { t: last.t, c: last.c } : null,
       indicators: out,
+      volumeSignal: computeVolumeSignal(candles),
     };
   },
 });
