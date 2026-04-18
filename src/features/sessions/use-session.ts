@@ -76,6 +76,10 @@ export function useSession(): SessionChannel {
     ): SessionId => {
       if (currentIdRef.current) return currentIdRef.current;
       const id = createSession();
+      // Claim the ref *before* any I/O so a re-entrant recordRow (React effect
+      // firing mid-append) short-circuits to this id instead of creating a
+      // second session file.
+      currentIdRef.current = id;
       const now = Date.now();
       createdAtRef.current = now;
       messageCountRef.current = 0;
@@ -91,10 +95,10 @@ export function useSession(): SessionChannel {
         });
         modelLoggedRef.current = true;
       }
-      setCurrentId(id);
+      setCurrentIdState(id);
       return id;
     },
-    [setCurrentId],
+    [],
   );
 
   const recordRow = useCallback(
