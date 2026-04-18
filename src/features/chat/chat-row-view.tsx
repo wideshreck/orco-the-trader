@@ -1,7 +1,7 @@
 import { Box, Text } from 'ink';
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { renderMarkdown } from '../../shared/ui/markdown.js';
-import { Elapsed, Spinner } from '../../shared/ui/spinner.js';
+import { Spinner } from '../../shared/ui/spinner.js';
 import { stripAnsi } from '../../shared/ui/strip-ansi.js';
 import type { TokenUsage } from '../tools/index.js';
 import { ToolCallView } from './tool-call-view.js';
@@ -53,15 +53,63 @@ export function ChatRowView(props: {
   );
 }
 
+// Thinking indicator with progressive hints: the model sitting on a big
+// synthesis step (20+ tool outputs, multi-TF analysis) can genuinely need
+// 60–120s of silent reasoning. A plain "thinking · 90s" spinner makes the
+// user wonder if the stream died. Bloom into increasingly informative
+// messaging so the wait feels observed, not broken.
 function ThinkingIndicator() {
   const startRef = useRef<number>(Date.now());
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const seconds = Math.max(0, Math.floor((now - startRef.current) / 1000));
+  const label = formatSeconds(seconds);
+  // Colors follow the same traffic-light shape as other ORCO countdowns.
+  if (seconds < 20) {
+    return (
+      <Box>
+        <Spinner color="magenta" />
+        <Text dimColor>{` thinking · ${label}`}</Text>
+      </Box>
+    );
+  }
+  if (seconds < 60) {
+    return (
+      <Box>
+        <Spinner color="magenta" />
+        <Text dimColor>{` processing results · `}</Text>
+        <Text color="yellow">{label}</Text>
+      </Box>
+    );
+  }
+  if (seconds < 120) {
+    return (
+      <Box>
+        <Spinner color="magenta" />
+        <Text dimColor>{` still synthesising · `}</Text>
+        <Text color="yellow">{label}</Text>
+        <Text dimColor> (large context — hang tight)</Text>
+      </Box>
+    );
+  }
   return (
     <Box>
       <Spinner color="magenta" />
-      <Text dimColor> thinking · </Text>
-      <Elapsed startMs={startRef.current} />
+      <Text dimColor>{` still no output · `}</Text>
+      <Text color="red">{label}</Text>
+      <Text dimColor> (ctrl+c to cancel; lighter model or narrower prompt helps)</Text>
     </Box>
   );
+}
+
+function formatSeconds(total: number): string {
+  if (total < 60) return `${total}s`;
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}m ${String(s).padStart(2, '0')}s`;
 }
 
 export function sumTokens(rows: ChatRow[]): TokenUsage {
